@@ -24,3 +24,9 @@ Tools yang digunakan
 - Frontend: Next.js
 - Database: MySQL (Laragon)
 - IoT: PZEM-004T, ESP32, Modul Relay.
+
+---
+
+File ATS
+Link Draft Laporan  : https://drive.google.com/file/d/15HiV5Xz52EpGh7V4o4UEhoyqOkfb3Kay/view?usp=drive_link 
+Link Video          : https://youtu.be/SgRy4yOeZEY?si=MnpQWsCtcud8josn 
