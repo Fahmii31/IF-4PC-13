@@ -1,6 +1,6 @@
 "use client";
 
-import AuthLayout from "@/components/AuthLayout";
+import AuthLayout from "@/components/layout/AuthLayout";
 import Link from "next/link";
 import { User, Mail, Phone, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
@@ -8,6 +8,14 @@ import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
   const router = useRouter();
+
+  interface RegisterErrors {
+    username?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    phone?: string;
+  }
 
   const [formData, setFormData] = useState({
     username: "",
@@ -17,17 +25,11 @@ export default function RegisterPage() {
     whatsapp: "",
   });
 
-  // State untuk menyimpan pesan error inline
-  const [errors, setErrors] = useState({
-    email: "",
-    confirmPassword: "",
-  });
+  const [errors, setErrors] = useState<RegisterErrors>({});
 
-  // State untuk toggle hide/show password
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Handle perubahan input text
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
@@ -38,167 +40,295 @@ export default function RegisterPage() {
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
-
-    if (name === "email") setErrors((prev) => ({ ...prev, email: "" }));
-    if (name === "confirmPassword" || name === "password") {
-      setErrors((prev) => ({ ...prev, confirmPassword: "" }));
-    }
+    setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    let isValid = true;
-    const newErrors = { email: "", confirmPassword: "" };
 
+    const newErrors: RegisterErrors = {};
+
+    // VALIDASI EMAIL FRONTEND
     if (!formData.email.toLowerCase().endsWith("@gmail.com")) {
-      newErrors.email = "Email wajib menggunakan @gmail.com";
-      isValid = false;
+      newErrors.email = "Email must use @gmail.com";
     }
 
+    // VALIDASI PASSWORD MATCH
     if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Konfirmasi password tidak cocok";
-      isValid = false;
+      newErrors.confirmPassword = "Passwords do not match";
     }
 
-    if (!isValid) {
+    if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    console.log("Registrasi Berhasil:", formData);
+    try {
+      const res = await fetch("http://localhost:8000/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.whatsapp,
+        }),
+      });
 
-    router.push("/login");
+      const result = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 422 && result.errors) {
+          setErrors(result.errors);
+        } else {
+          alert(result.message || "Register failed");
+        }
+        return;
+      }
+
+      alert(result.message || "Register success 🎉");
+      router.push("/login");
+
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message);
+      }
+      alert("Server error");
+    }
   };
 
-  return (
-    <AuthLayout>
-      <div className="w-full max-w-md mx-auto p-6">
-        <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
-          Create your account
-        </h2>
-        <p className="text-gray-500 text-center mb-6">
-          Join and start monitoring your energy usage
-        </p>
+return (
+  <AuthLayout>
+    <div className="w-full max-w-md mx-auto">
+      
+      <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-2 leading-tight">
+        Create your account
+      </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <p className="text-sm sm:text-base text-gray-500 text-center mb-6 sm:mb-8">
+        Join and start monitoring your energy usage
+      </p>
 
-            <div className="relative">
-              <label className="text-sm text-gray-600 mb-1 block">Username</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  name="username"
-                  required
-                  value={formData.username}
-                  onChange={handleChange}
-                  className="w-full p-3 pr-10 rounded-lg bg-gray-100 text-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition"
-                />
-                <User className="absolute right-3 top-3.5 text-gray-400" size={18} />
-              </div>
-            </div>
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4 sm:space-y-5"
+      >
 
-            <div>
-              <label className="text-sm text-gray-600 mb-1 block">Email</label>
-              <div className="relative">
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  className={`w-full p-3 pr-10 rounded-lg bg-gray-100 text-gray-900 focus:ring-2 outline-none transition ${
-                    errors.email ? "ring-2 ring-red-500" : "focus:ring-blue-500"
-                  }`}
-                  placeholder="example@gmail.com"
-                />
-                <Mail className="absolute right-3 top-3.5 text-gray-400" size={18} />
-              </div>
-              {errors.email && (
-                <p className="text-red-500 text-[10px] mt-1 font-medium">{errors.email}</p>
-              )}
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-            <div>
-              <label className="text-sm text-gray-600 mb-1 block">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="w-full p-3 pr-10 rounded-lg bg-gray-100 text-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3.5 text-gray-400 hover:text-blue-600 transition"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
+          {/* USERNAME */}
+          <div className="relative">
+            <label className="text-sm text-gray-600 mb-1 block">
+              Username
+            </label>
 
-            <div>
-              <label className="text-sm text-gray-600 mb-1 block">Confirm Password</label>
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  name="confirmPassword"
-                  required
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className={`w-full p-3 pr-10 rounded-lg bg-gray-100 text-gray-900 focus:ring-2 outline-none transition ${
-                    errors.confirmPassword ? "ring-2 ring-red-500" : "focus:ring-blue-500"
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-3.5 text-gray-400 hover:text-blue-600 transition"
-                >
-                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {errors.confirmPassword && (
-                <p className="text-red-500 text-[10px] mt-1 font-medium">{errors.confirmPassword}</p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm text-gray-600 mb-1 block">WhatsApp Number</label>
             <div className="relative">
               <input
                 type="text"
-                name="whatsapp"
+                name="username"
                 required
-                placeholder="08xxxxxxxxxx"
-                value={formData.whatsapp}
+                placeholder="Jhon Doe"
+                value={formData.username}
                 onChange={handleChange}
-                inputMode="numeric"
-                className="w-full p-3 pr-10 rounded-lg bg-gray-100 text-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition"
+                className={`w-full h-12 sm:h-14 px-4 pr-10 rounded-xl bg-gray-100 text-gray-900 placeholder-gray-400 focus:ring-2 outline-none transition
+                ${
+                  errors.username
+                    ? "ring-2 ring-red-500"
+                    : "focus:ring-blue-500"
+                }`}
               />
-              <Phone className="absolute right-3 top-3.5 text-gray-400" size={18} />
+
+              <User
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
             </div>
+
+            {errors.username && (
+              <p className="text-red-500 text-[11px] mt-1 font-medium">
+                {errors.username}
+              </p>
+            )}
           </div>
 
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all active:scale-[0.98] mt-4"
-          >
-            Sign Up
-          </button>
-        </form>
+          {/* EMAIL */}
+          <div>
+            <label className="text-sm text-gray-600 mb-1 block">
+              Email
+            </label>
 
-        <p className="text-center mt-6 text-gray-500 text-sm">
-          Already have an account?{" "}
-          <Link href="/login" className="text-blue-600 font-semibold hover:underline">
-            Sign In
-          </Link>
-        </p>
-      </div>
-    </AuthLayout>
-  );
+            <div className="relative">
+              <input
+                type="email"
+                name="email"
+                required
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="example@gmail.com"
+                className={`w-full h-12 sm:h-14 px-4 pr-10 rounded-xl bg-gray-100 text-gray-900 placeholder-gray-400 focus:ring-2 outline-none transition
+                ${
+                  errors.email
+                    ? "ring-2 ring-red-500"
+                    : "focus:ring-blue-500"
+                }`}
+              />
+
+              <Mail
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
+            </div>
+
+            {errors.email && (
+              <p className="text-red-500 text-[11px] mt-1 font-medium">
+                {errors.email}
+              </p>
+            )}
+          </div>
+
+          {/* PASSWORD */}
+          <div>
+            <label className="text-sm text-gray-600 mb-1 block">
+              Password
+            </label>
+
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                required
+                placeholder="********"
+                value={formData.password}
+                onChange={handleChange}
+                className={`w-full h-12 sm:h-14 px-4 pr-10 rounded-xl bg-gray-100 text-gray-900 placeholder-gray-400 focus:ring-2 outline-none transition
+                ${
+                  errors.password
+                    ? "ring-2 ring-red-500"
+                    : "focus:ring-blue-500"
+                }`}
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition"
+              >
+                {showPassword ? (
+                  <EyeOff size={18} />
+                ) : (
+                  <Eye size={18} />
+                )}
+              </button>
+            </div>
+
+            {errors.password && (
+              <p className="text-red-500 text-[11px] mt-1 font-medium">
+                {errors.password}
+              </p>
+            )}
+          </div>
+
+          {/* CONFIRM PASSWORD */}
+          <div>
+            <label className="text-sm text-gray-600 mb-1 block">
+              Confirm Password
+            </label>
+
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                name="confirmPassword"
+                required
+                placeholder="********"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className={`w-full h-12 sm:h-14 px-4 pr-10 rounded-xl bg-gray-100 text-gray-900 placeholder-gray-400 focus:ring-2 outline-none transition
+                ${
+                  errors.confirmPassword
+                    ? "ring-2 ring-red-500"
+                    : "focus:ring-blue-500"
+                }`}
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  setShowConfirmPassword(!showConfirmPassword)
+                }
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition"
+              >
+                {showConfirmPassword ? (
+                  <EyeOff size={18} />
+                ) : (
+                  <Eye size={18} />
+                )}
+              </button>
+            </div>
+
+            {errors.confirmPassword && (
+              <p className="text-red-500 text-[11px] mt-1 font-medium">
+                {errors.confirmPassword}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* WHATSAPP */}
+        <div>
+          <label className="text-sm text-gray-600 mb-1 block">
+            WhatsApp Number
+          </label>
+
+          <div className="relative">
+            <input
+              type="text"
+              name="whatsapp"
+              required
+              placeholder="08xxxxxxxxxx"
+              value={formData.whatsapp}
+              onChange={handleChange}
+              inputMode="numeric"
+              className={`w-full h-12 sm:h-14 px-4 pr-10 rounded-xl bg-gray-100 text-gray-900 placeholder-gray-400 focus:ring-2 outline-none transition
+              ${
+                errors.phone
+                  ? "ring-2 ring-red-500"
+                  : "focus:ring-blue-500"
+              }`}
+            />
+
+            <Phone
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+              size={18}
+            />
+          </div>
+
+          {errors.phone && (
+            <p className="text-red-500 text-[11px] mt-1 font-medium">
+              {errors.phone}
+            </p>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          className="w-full h-12 sm:h-14 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-md mt-2"
+        >
+          Sign Up
+        </button>
+      </form>
+
+      <p className="text-center mt-6 sm:mt-8 text-gray-500 text-sm">
+        Already have an account?{" "}
+        <Link
+          href="/login"
+          className="text-blue-600 font-semibold hover:underline"
+        >
+          Sign In
+        </Link>
+      </p>
+    </div>
+  </AuthLayout>
+);
 }

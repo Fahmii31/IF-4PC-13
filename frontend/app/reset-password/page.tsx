@@ -2,124 +2,276 @@
 
 import LogoBlue from "@/components/LogoBlue";
 import { Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export default function ResetPasswordPage() {
-  const router = useRouter(); // Inisialisasi router untuk navigasi
-  
-  // State untuk kontrol mata (show/hide password)
+  const router = useRouter();
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
-  // State untuk menyimpan input
+
   const [formData, setFormData] = useState({
     password: "",
     confirmPassword: "",
   });
 
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const otpVerified = localStorage.getItem("otpVerified");
+
+    if (!otpVerified) {
+      router.push("/forgot-password");
+    }
+  }, [router]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    // Pastikan "setFormData" ditulis dengan huruf F dan D besar agar tidak merah
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validasi sederhana: pastikan password sama
-    if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!");
+    setError("");
+
+    const email = localStorage.getItem("resetEmail");
+
+    if (!email) {
+      router.push("/forgot-password");
       return;
     }
 
-    // Simulasi Berhasil
-    console.log("Password updated!");
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
 
-    // PINDAH KE HALAMAN LOGIN
-    router.push("/login");
+    const passwordRegex = /^(?=.*[A-Z])(?=.*[0-9]).{8,}$/;
+
+    if (!passwordRegex.test(formData.password)) {
+      setError("Password must be at least 8 characters, include 1 uppercase letter and 1 number");
+      return;
+    }
+
+    try {
+      const res = await fetch("http://localhost:8000/api/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password: formData.password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.message || "Reset password failed");
+        return;
+      }
+
+      alert(data.message || "Password has been successfully updated");
+
+      localStorage.removeItem("resetEmail");
+      localStorage.removeItem("otpVerified");
+
+      router.push("/login");
+
+    } catch {
+      setError("Server error. Please try again later.");
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center 
-    bg-gradient-to-br from-white via-blue-50 to-blue-200 p-6">
+  <div
+    className="
+      min-h-screen 
+      flex items-center justify-center
+      bg-gradient-to-br from-white via-blue-50 to-blue-200
+      px-4 py-8 sm:px-6
+    "
+  >
+    <div
+      className="
+        w-full max-w-md
+        bg-white
+        rounded-[2rem]
+        shadow-2xl
+        p-6 sm:p-8
+      "
+    >
 
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8">
+      {/* LOGO */}
+      <div className="flex flex-col items-center mb-6 sm:mb-8">
+        <LogoBlue />
 
-        {/* LOGO */}
-        <div className="flex flex-col items-center mb-6">
-          <LogoBlue />
-          <h1 className="text-blue-600 font-bold text-xl mt-3">VoltCore</h1>
-          <p className="text-xs tracking-widest text-gray-500">POWER INTELLIGENCE</p>
-        </div>
+        <h1 className="text-blue-600 font-bold text-xl mt-3">
+          VoltCore
+        </h1>
 
-        <h2 className="text-xl font-semibold text-center text-gray-900 mb-2">
+        <p className="text-[10px] sm:text-xs tracking-[0.25em] text-gray-500 text-center">
+          POWER INTELLIGENCE
+        </p>
+      </div>
+
+      {/* TITLE */}
+      <div className="text-center mb-8">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
           New Password
         </h2>
-        <p className="text-center text-gray-500 mb-8 text-sm">
+
+        <p className="text-sm sm:text-base text-gray-500 leading-relaxed">
           Set your new password to regain access to your hub.
         </p>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          
-          {/* INPUT PASSWORD BARU */}
-          <div className="relative">
-            <label className="text-sm text-gray-600 mb-1 block">New Password</label>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                className="w-full p-4 pr-12 rounded-xl bg-gray-100 text-gray-900 
-                focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-4 text-gray-400 hover:text-gray-600"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
-
-          {/* KONFIRMASI PASSWORD */}
-          <div className="relative">
-            <label className="text-sm text-gray-600 mb-1 block">Confirm Password</label>
-            <div className="relative">
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                name="confirmPassword"
-                required
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="••••••••"
-                className="w-full p-4 pr-12 rounded-xl bg-gray-100 text-gray-900 
-                focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-4 text-gray-400 hover:text-gray-600"
-              >
-                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold 
-            hover:bg-blue-700 transition shadow-md active:scale-[0.98] mt-4"
-          >
-            CONFIRM
-          </button>
-        </form>
-
       </div>
+
+      {/* FORM */}
+      <form onSubmit={handleSubmit} className="space-y-5">
+
+        {/* PASSWORD */}
+        <div>
+          <label className="text-sm text-gray-600 mb-2 block">
+            New Password
+          </label>
+
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              required
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="********"
+              className="
+                w-full
+                h-12 sm:h-14
+                px-4 pr-12
+                rounded-xl
+                bg-gray-100
+                text-gray-900
+                placeholder-gray-400
+                focus:outline-none
+                focus:ring-2
+                focus:ring-blue-500
+                transition
+                text-sm sm:text-base
+              "
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="
+                absolute right-4 top-1/2 -translate-y-1/2
+                text-gray-400 hover:text-blue-600
+                transition
+              "
+            >
+              {showPassword ? (
+                <EyeOff size={18} />
+              ) : (
+                <Eye size={18} />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* CONFIRM PASSWORD */}
+        <div>
+          <label className="text-sm text-gray-600 mb-2 block">
+            Confirm Password
+          </label>
+
+          <div className="relative">
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              name="confirmPassword"
+              required
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              placeholder="********"
+              className="
+                w-full
+                h-12 sm:h-14
+                px-4 pr-12
+                rounded-xl
+                bg-gray-100
+                text-gray-900
+                placeholder-gray-400
+                focus:outline-none
+                focus:ring-2
+                focus:ring-blue-500
+                transition
+                text-sm sm:text-base
+              "
+            />
+
+            <button
+              type="button"
+              onClick={() =>
+                setShowConfirmPassword(!showConfirmPassword)
+              }
+              className="
+                absolute right-4 top-1/2 -translate-y-1/2
+                text-gray-400 hover:text-blue-600
+                transition
+              "
+            >
+              {showConfirmPassword ? (
+                <EyeOff size={18} />
+              ) : (
+                <Eye size={18} />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* ERROR */}
+        {error && (
+          <div
+            className="
+              bg-red-50
+              border border-red-200
+              text-red-600
+              text-sm
+              px-4 py-3
+              rounded-xl
+            "
+          >
+            {error}
+          </div>
+        )}
+
+        {/* BUTTON */}
+        <button
+          type="submit"
+          className="
+            w-full
+            h-12 sm:h-14
+            bg-blue-600
+            text-white
+            rounded-xl
+            font-semibold
+            text-sm sm:text-base
+            hover:bg-blue-700
+            transition
+            shadow-lg shadow-blue-100
+            active:scale-[0.98]
+            mt-2
+          "
+        >
+          CONFIRM
+        </button>
+      </form>
+
     </div>
-  );
+  </div>
+);
 }

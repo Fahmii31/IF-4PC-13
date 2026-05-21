@@ -1,23 +1,66 @@
 "use client";
 
 import LogoBlue from "@/components/LogoBlue";
-import Link from "next/link"; // Tambahkan import Link
-import { Mail, ChevronLeft } from "lucide-react"; // Tambahkan ChevronLeft
+import Link from "next/link";
+import { Mail, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [email, setEmail] = useState("");
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push("/verify-otp");
+
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetch("http://localhost:8000/api/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        // HANDLE VALIDATION (422)
+        if (res.status === 422 && data.errors) {
+          setError(Object.values(data.errors).flat().join(", "));
+        } else {
+          setError(data.message || "Something went wrong");
+        }
+        return;
+      }
+
+      // SUCCESS MESSAGE
+      setSuccess(data.message || "OTP has been sent");
+
+      // simpan email untuk step OTP
+      localStorage.setItem("resetEmail", email);
+
+      setTimeout(() => {
+        router.push("/verify-otp");
+      }, 1200);
+
+    } catch (err) {
+      console.error(err);
+      setError("Cannot connect to server");
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center 
-    bg-gradient-to-br from-white via-blue-50 to-blue-200 p-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-200 px-4 py-8 sm:p-6">
 
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8">
+      <div className="w-full max-w-md bg-white rounded-[2rem] shadow-2xl p-6 sm:p-8">
 
         {/* LOGO + TEXT */}
         <div className="flex flex-col items-center mb-6">
@@ -51,13 +94,34 @@ export default function ForgotPasswordPage() {
             <input
               type="email"
               required
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError(""); // reset error saat ngetik
+                setSuccess("");
+              }}
               placeholder="example@gmail.com"
-              className="w-full p-4 pr-10 rounded-xl bg-gray-100 text-gray-900 
-              focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              className={`w-full p-4 pr-10 rounded-xl bg-gray-100 text-gray-900 
+              focus:outline-none focus:ring-2 transition
+              ${error ? "ring-2 ring-yellow-400" : "focus:ring-blue-500"}`}
             />
 
-            <Mail className="absolute right-3 top-[42px] text-gray-400" size={18}/>
+            <Mail className="absolute right-3 top-[42px] text-gray-400" size={18} />
           </div>
+
+          {/* ERROR MESSAGE */}
+          {error && (
+            <div className="bg-yellow-50 border border-yellow-300 text-yellow-700 text-sm px-4 py-2 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          {/* SUCCESS MESSAGE */}
+          {success && (
+            <div className="bg-green-50 border border-green-300 text-green-700 text-sm px-4 py-2 rounded-lg">
+              {success}
+            </div>
+          )}
 
           <button
             type="submit"
@@ -70,8 +134,8 @@ export default function ForgotPasswordPage() {
 
         {/* TOMBOL KEMBALI KE LOGIN */}
         <div className="mt-8 pt-6 border-t border-gray-100">
-          <Link 
-            href="/login" 
+          <Link
+            href="/login"
             className="flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition font-medium"
           >
             <ChevronLeft size={16} />
