@@ -1,4 +1,4 @@
-import Logo from "./Logo";
+import Logo from "../Logo";
 import Image from "next/image";
 
 export default function AuthLayout({
