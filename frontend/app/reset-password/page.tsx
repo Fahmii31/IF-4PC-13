@@ -4,6 +4,7 @@ import LogoBlue from "@/components/LogoBlue";
 import { Eye, EyeOff } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Cookies from "js-cookie";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -35,59 +36,102 @@ export default function ResetPasswordPage() {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+ const handleSubmit = async (e: React.FormEvent) => {
 
-    const email = localStorage.getItem("resetEmail");
+  e.preventDefault();
 
-    if (!email) {
-      router.push("/forgot-password");
+  setError("");
+
+  const email = localStorage.getItem("resetEmail");
+
+  if (!email) {
+
+    router.push("/forgot-password");
+
+    return;
+  }
+
+  // VALIDASI PASSWORD MATCH
+  if (formData.password !== formData.confirmPassword) {
+
+    setError("Passwords do not match");
+
+    return;
+  }
+
+  // VALIDASI PASSWORD
+  const passwordRegex = /^(?=.*[A-Z])(?=.*[0-9]).{8,}$/;
+
+  if (!passwordRegex.test(formData.password)) {
+
+    setError(
+      "Password must be at least 8 characters, include 1 uppercase letter and 1 number"
+    );
+
+    return;
+  }
+
+  try {
+
+    // AMBIL CSRF COOKIE
+    await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+      credentials: "include",
+    });
+
+    // AMBIL TOKEN
+    const token = Cookies.get("XSRF-TOKEN");
+
+    // REQUEST RESET PASSWORD
+    const res = await fetch("http://localhost:8000/reset-password", {
+
+      method: "POST",
+
+      credentials: "include",
+
+      headers: {
+
+        "Content-Type": "application/json",
+
+        Accept: "application/json",
+
+        "X-Requested-With": "XMLHttpRequest",
+
+        "X-XSRF-TOKEN": decodeURIComponent(token || ""),
+
+      },
+
+      body: JSON.stringify({
+        email,
+        password: formData.password,
+      }),
+
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+
+      setError(data.message || "Reset password failed");
+
       return;
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
+    alert(data.message || "Password has been successfully updated");
 
-    const passwordRegex = /^(?=.*[A-Z])(?=.*[0-9]).{8,}$/;
+    localStorage.removeItem("resetEmail");
 
-    if (!passwordRegex.test(formData.password)) {
-      setError("Password must be at least 8 characters, include 1 uppercase letter and 1 number");
-      return;
-    }
+    localStorage.removeItem("otpVerified");
 
-    try {
-      const res = await fetch("http://localhost:8000/api/reset-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password: formData.password,
-        }),
-      });
+    router.push("/login");
 
-      const data = await res.json();
+  } catch (err) {
 
-      if (!res.ok) {
-        setError(data.message || "Reset password failed");
-        return;
-      }
+    console.error(err);
 
-      alert(data.message || "Password has been successfully updated");
+    setError("Server error. Please try again later.");
 
-      localStorage.removeItem("resetEmail");
-      localStorage.removeItem("otpVerified");
-
-      router.push("/login");
-
-    } catch {
-      setError("Server error. Please try again later.");
-    }
-  };
+  }
+};
 
   return (
   <div

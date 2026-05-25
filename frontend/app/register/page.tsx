@@ -1,20 +1,33 @@
 "use client";
 
 import AuthLayout from "@/components/layout/AuthLayout";
+
 import Link from "next/link";
-import { User, Mail, Phone, Eye, EyeOff } from "lucide-react";
+
+import {
+  User,
+  Mail,
+  Phone,
+  Eye,
+  EyeOff
+} from "lucide-react";
+
 import { useState } from "react";
+
 import { useRouter } from "next/navigation";
 
+import { registerUser } from "@/lib/auth";
+
 export default function RegisterPage() {
+
   const router = useRouter();
 
   interface RegisterErrors {
-    username?: string;
-    email?: string;
-    password?: string;
+    username?: string[];
+    email?: string[];
+    password?: string[];
     confirmPassword?: string;
-    phone?: string;
+    phone?: string[];
   }
 
   const [formData, setFormData] = useState({
@@ -25,76 +38,132 @@ export default function RegisterPage() {
     whatsapp: "",
   });
 
-  const [errors, setErrors] = useState<RegisterErrors>({});
+  const [errors, setErrors] =
+    useState<RegisterErrors>({});
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPassword, setShowPassword] =
+    useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState(false);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+
     const { name, value } = e.target;
 
     if (name === "whatsapp") {
-      const onlyNumbers = value.replace(/[^0-9]/g, "");
-      setFormData((prev) => ({ ...prev, [name]: onlyNumbers }));
+
+      const onlyNumbers =
+        value.replace(/[^0-9]/g, "");
+
+      setFormData((prev) => ({
+        ...prev,
+        [name]: onlyNumbers
+      }));
+
       return;
     }
 
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: "" }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value
+    }));
+
+    setErrors((prev) => ({
+      ...prev,
+      [name]: undefined
+    }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (
+    e: React.FormEvent
+  ) => {
+
     e.preventDefault();
 
     const newErrors: RegisterErrors = {};
 
-    // VALIDASI EMAIL FRONTEND
-    if (!formData.email.toLowerCase().endsWith("@gmail.com")) {
-      newErrors.email = "Email must use @gmail.com";
+    // VALIDASI EMAIL
+    if (
+      !formData.email
+        .toLowerCase()
+        .endsWith("@gmail.com")
+    ) {
+
+      newErrors.email = [
+        "Email must use @gmail.com"
+      ];
     }
 
     // VALIDASI PASSWORD MATCH
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
+    if (
+      formData.password !==
+      formData.confirmPassword
+    ) {
+
+      newErrors.confirmPassword =
+        "Passwords do not match";
     }
 
-    if (Object.keys(newErrors).length > 0) {
+    if (
+      Object.keys(newErrors).length > 0
+    ) {
+
       setErrors(newErrors);
+
       return;
     }
 
     try {
-      const res = await fetch("http://localhost:8000/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-          phone: formData.whatsapp,
-        }),
+
+      const res = await registerUser({
+
+        username: formData.username,
+
+        email: formData.email,
+
+        password: formData.password,
+
+        phone: formData.whatsapp,
       });
 
-      const result = await res.json();
+      const result =
+        await res.json();
 
+      // VALIDATION ERROR
       if (!res.ok) {
-        if (res.status === 422 && result.errors) {
+
+        if (
+          res.status === 422 &&
+          result.errors
+        ) {
+
           setErrors(result.errors);
+
         } else {
-          alert(result.message || "Register failed");
+
+          alert(
+            result.message ||
+            "Register failed"
+          );
         }
+
         return;
       }
 
-      alert(result.message || "Register success 🎉");
-      router.push("/login");
+      alert(
+        result.message ||
+        "Register success 🎉"
+      );
+
+      router.replace("/login");
 
     } catch (error) {
-      if (error instanceof Error) {
-        console.error(error.message);
-      }
+
+      console.error(error);
+
       alert("Server error");
     }
   };

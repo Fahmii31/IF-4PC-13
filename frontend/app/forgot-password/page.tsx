@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Mail, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Cookies from "js-cookie";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -14,48 +15,85 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+const handleSubmit = async (e: React.FormEvent) => {
 
-    setError("");
-    setSuccess("");
+  e.preventDefault();
 
-    try {
-      const res = await fetch("http://localhost:8000/api/forgot-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
+  setError("");
+  setSuccess("");
 
-      const data = await res.json();
+  try {
 
-      if (!res.ok) {
-        // HANDLE VALIDATION (422)
-        if (res.status === 422 && data.errors) {
-          setError(Object.values(data.errors).flat().join(", "));
-        } else {
-          setError(data.message || "Something went wrong");
-        }
-        return;
+    // AMBIL CSRF COOKIE
+    await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+      credentials: "include",
+    });
+
+    // AMBIL TOKEN DARI COOKIE
+    const token = Cookies.get("XSRF-TOKEN");
+
+    // REQUEST
+    const res = await fetch("http://localhost:8000/forgot-password", {
+
+      method: "POST",
+
+      credentials: "include",
+
+      headers: {
+
+        "Content-Type": "application/json",
+
+        Accept: "application/json",
+
+        "X-Requested-With": "XMLHttpRequest",
+
+        "X-XSRF-TOKEN": decodeURIComponent(token || ""),
+
+      },
+
+      body: JSON.stringify({
+        email,
+      }),
+
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+
+      if (res.status === 422 && data.errors) {
+
+        setError(
+          Object.values(data.errors).flat().join(", ")
+        );
+
+      } else {
+
+        setError(data.message || "Something went wrong");
+
       }
 
-      // SUCCESS MESSAGE
-      setSuccess(data.message || "OTP has been sent");
-
-      // simpan email untuk step OTP
-      localStorage.setItem("resetEmail", email);
-
-      setTimeout(() => {
-        router.push("/verify-otp");
-      }, 1200);
-
-    } catch (err) {
-      console.error(err);
-      setError("Cannot connect to server");
+      return;
     }
-  };
+
+    setSuccess(data.message || "OTP has been sent");
+
+    localStorage.setItem("resetEmail", email);
+
+    setTimeout(() => {
+
+      router.push("/verify-otp");
+
+    }, 1200);
+
+  } catch (err) {
+
+    console.error(err);
+
+    setError("Cannot connect to server");
+
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-200 px-4 py-8 sm:p-6">

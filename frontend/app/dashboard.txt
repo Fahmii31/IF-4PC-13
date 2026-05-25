@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 
 import {
   AlertTriangle,
@@ -24,20 +24,22 @@ import { useRouter } from "next/navigation";
 import Notifications from "@/components/Notifications";
 import MainLayout from "@/components/layout/MainLayout";
 
-import { useAuth } from "@/hooks/useAuth";
-import { logoutUser } from "@/lib/logout";
+type User = {
+  id: number;
+  username: string;
+  email: string;
+  phone: string;
+};
 
 export default function DashboardPage() {
 
   const router = useRouter();
 
-  // AUTH
-  const {
-    user
-  } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
+
+  const [loading, setLoading] = useState(true);
 
   const [showAlert, setShowAlert] = useState(true);
-
   const [powerOn, setPowerOn] = useState(true);
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -51,12 +53,96 @@ export default function DashboardPage() {
     { time: "23:59", kwh: 20 },
   ], []);
 
+  // CEK LOGIN
+  useEffect(() => {
+
+    const getUser = async () => {
+
+      try {
+
+        const res = await fetch("http://localhost:8000/api/me", {
+
+          credentials: "include",
+
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        // JIKA SESSION SUDAH HILANG
+        if (!res.ok) {
+
+          setUser(null);
+
+          router.replace("/login");
+
+          return;
+        }
+
+        const data = await res.json();
+
+        setUser(data);
+
+      } catch (error) {
+
+        console.error(error);
+
+        setUser(null);
+
+        router.replace("/login");
+
+      } finally {
+
+        setLoading(false);
+      }
+    };
+
+    getUser();
+
+  }, [router]);
+
+
   // LOGOUT
   const handleLogout = async () => {
 
-    await logoutUser();
+    try {
 
-    router.replace("/login");
+      // ambil csrf cookie
+      await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+        credentials: "include",
+      });
+
+      // ambil xsrf token
+      const xsrfToken = decodeURIComponent(
+        document.cookie
+          .split("; ")
+          .find((row) => row.startsWith("XSRF-TOKEN="))
+          ?.split("=")[1] || ""
+      );
+
+      // logout request
+      await fetch("http://localhost:8000/logout", {
+
+        method: "POST",
+
+        credentials: "include",
+
+        headers: {
+          Accept: "application/json",
+          "X-XSRF-TOKEN": xsrfToken,
+        },
+      });
+
+      // RESET STATE
+      setUser(null);
+
+      // HARD REDIRECT
+      router.replace("/login");
+
+    } catch (error) {
+
+      console.error(error);
+    }
   };
 
   return (

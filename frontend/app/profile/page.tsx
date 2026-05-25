@@ -1,124 +1,238 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { ShieldCheck, User as UserIcon, Edit3, X, Save, Eye, EyeOff } from "lucide-react";
+import React, { useState, useEffect } from "react";
+
+import {
+  ShieldCheck,
+  User as UserIcon,
+  Edit3,
+  X,
+  Save,
+  Eye,
+  EyeOff
+} from "lucide-react";
+
 import { useRouter } from "next/navigation";
+
 import MainLayout from "@/components/layout/MainLayout";
 import Notifications from "@/components/Notifications";
 
-// Definisi Interface untuk menghindari error 'any'
-interface UserData {
-    id: number;
-    username: string;
-    email: string;
-    phone: string;
-}
+import { useAuth } from "@/hooks/useAuth";
+import { logoutUser } from "@/lib/logout";
 
 export default function ProfilePage() {
-    const router = useRouter();
-    const [user, setUser] = useState<UserData | null>(null);
-    const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-    
-    // Toggle Edit Modes
-    const [isEditProfile, setIsEditProfile] = useState(false);
-    const [isEditPassword, setIsEditPassword] = useState(false);
 
-    // Show/Hide Password State
-    const [showCurrent, setShowCurrent] = useState(false);
-    const [showNew, setShowNew] = useState(false);
+  const router = useRouter();
 
-    // States
-    const [formData, setFormData] = useState({ username: "", phone: "" });
-    const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
-    const [loading, setLoading] = useState(false);
+  // AUTH
+  const { user, loading } = useAuth();
 
-    // Menggunakan useCallback untuk menghindari render berulang
-    const fetchUser = useCallback(async () => {
-        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-        if (!token) {
-            router.push("/login");
-            return;
+  const [isNotificationOpen, setIsNotificationOpen] =
+    useState(false);
+
+  // Toggle Edit Modes
+  const [isEditProfile, setIsEditProfile] =
+    useState(false);
+
+  const [isEditPassword, setIsEditPassword] =
+    useState(false);
+
+  // Show/Hide Password State
+  const [showCurrent, setShowCurrent] =
+    useState(false);
+
+  const [showNew, setShowNew] =
+    useState(false);
+
+  // States
+  const [formData, setFormData] = useState({
+    username: "",
+    phone: ""
+  });
+
+  const [passwords, setPasswords] = useState({
+    current: "",
+    new: "",
+    confirm: ""
+  });
+
+  const [, setSubmitLoading] =
+    useState(false);
+
+ useEffect(() => {
+
+  if (user) {
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFormData({
+      username: user.username,
+      phone: user.phone
+    });
+  }
+
+}, [user]);
+
+  // UPDATE PROFILE
+  const handleUpdateProfile = async () => {
+
+    setSubmitLoading(true);
+
+    try {
+
+      // CSRF COOKIE
+      await fetch(
+        "http://localhost:8000/sanctum/csrf-cookie",
+        {
+          credentials: "include"
         }
+      );
 
-        try {
-            const res = await fetch("http://localhost:8000/api/me", {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setUser(data);
-                setFormData({ username: data.username, phone: data.phone });
-            }
-        } catch (error) {
-            console.error("Failed to fetch user", error);
+      // XSRF TOKEN
+      const xsrfToken = decodeURIComponent(
+        document.cookie
+          .split("; ")
+          .find((row) =>
+            row.startsWith("XSRF-TOKEN=")
+          )
+          ?.split("=")[1] || ""
+      );
+
+      const res = await fetch(
+        "http://localhost:8000/api/update-profile",
+        {
+          method: "PUT",
+
+          credentials: "include",
+
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "X-XSRF-TOKEN": xsrfToken
+          },
+
+          body: JSON.stringify(formData)
         }
-    }, [router]);
+      );
 
-    useEffect(() => {
-    // Buat fungsi internal atau panggil langsung secara async
-    const init = async () => {
-        await fetchUser();
-    };
-    init();
-}, [fetchUser]);
+      const data = await res.json();
 
-    const handleUpdateProfile = async () => {
-        setLoading(true);
-        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-        try {
-            const res = await fetch("http://localhost:8000/api/update-profile", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify(formData)
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setUser(data.user);
-                setIsEditProfile(false);
-                alert(data.message);
-            } else { alert(data.message); }
-        } catch { alert("Connection Error"); } // Menghapus variabel 'err' yang tidak terpakai
-        setLoading(false);
-    };
+      if (res.ok) {
 
-    const handleChangePassword = async () => {
-        if (passwords.new !== passwords.confirm) return alert("Passwords do not match!");
-        
-        setLoading(true);
-        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-        try {
-            const res = await fetch("http://localhost:8000/api/change-password", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({
-                    current_password: passwords.current,
-                    new_password: passwords.new
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                alert("Success! Please login with your new password.");
-                handleLogout();
-            } else { alert(data.message); }
-        } catch { alert("Error changing password"); }
-        setLoading(false);
-    };
+        setIsEditProfile(false);
 
-    const handleLogout = () => {
-        localStorage.clear();
-        sessionStorage.clear();
-        router.push("/login");
-    };
+        alert(data.message);
+
+        window.location.reload();
+
+      } else {
+
+        alert(data.message);
+      }
+
+    } catch {
+
+      alert("Connection Error");
+
+    } finally {
+
+      setSubmitLoading(false);
+    }
+  };
+
+  // CHANGE PASSWORD
+  const handleChangePassword = async () => {
+
+    if (passwords.new !== passwords.confirm) {
+
+      return alert("Passwords do not match!");
+    }
+
+    setSubmitLoading(true);
+
+    try {
+
+      // CSRF COOKIE
+      await fetch(
+        "http://localhost:8000/sanctum/csrf-cookie",
+        {
+          credentials: "include"
+        }
+      );
+
+      // XSRF TOKEN
+      const xsrfToken = decodeURIComponent(
+        document.cookie
+          .split("; ")
+          .find((row) =>
+            row.startsWith("XSRF-TOKEN=")
+          )
+          ?.split("=")[1] || ""
+      );
+
+      const res = await fetch(
+        "http://localhost:8000/api/change-password",
+        {
+          method: "POST",
+
+          credentials: "include",
+
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "X-XSRF-TOKEN": xsrfToken
+          },
+
+          body: JSON.stringify({
+            current_password: passwords.current,
+            new_password: passwords.new
+          })
+        }
+      );
+
+      const data = await res.json();
+
+      if (res.ok) {
+
+        alert(
+          "Success! Please login with your new password."
+        );
+
+        await logoutUser();
+
+        router.replace("/login");
+
+      } else {
+
+        alert(data.message);
+      }
+
+    } catch {
+
+      alert("Error changing password");
+
+    } finally {
+
+      setSubmitLoading(false);
+    }
+  };
+
+  // LOGOUT
+  const handleLogout = async () => {
+
+    await logoutUser();
+
+    router.replace("/login");
+  };
 
     return (
-        <MainLayout 
-            title="My Profile" 
-            user={user} 
+        <MainLayout
+            title="My Profile"
+            user={user}
             onLogout={handleLogout} // Menambahkan onLogout yang hilang
             onNotificationClick={() => setIsNotificationOpen(true)}
         >
             <div className="p-8 max-w-5xl mx-auto space-y-8">
-                
+
                 {/* Profile Header Card */}
                 <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm flex flex-col md:flex-row items-center gap-6">
                     <div className="w-24 h-24 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600">
@@ -129,7 +243,7 @@ export default function ProfilePage() {
                         <p className="text-gray-400 text-sm">{user?.email}</p>
                     </div>
                     {!isEditProfile && (
-                        <button 
+                        <button
                             onClick={() => setIsEditProfile(true)}
                             className="flex items-center gap-2 px-6 py-3 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-xl transition font-semibold text-sm"
                         >
@@ -144,17 +258,17 @@ export default function ProfilePage() {
                         <div className="flex justify-between items-center">
                             <h3 className="font-bold text-gray-800 uppercase tracking-widest text-xs">Personal Details</h3>
                             {isEditProfile && (
-                                <button onClick={() => setIsEditProfile(false)} className="text-red-500"><X size={18}/></button>
+                                <button onClick={() => setIsEditProfile(false)} className="text-red-500"><X size={18} /></button>
                             )}
                         </div>
-                        
+
                         <div className="space-y-4">
                             <div>
                                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Username</label>
-                                <input 
+                                <input
                                     disabled={!isEditProfile}
                                     value={formData.username}
-                                    onChange={(e) => setFormData({...formData, username: e.target.value})}
+                                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                                     className={`w-full p-4 rounded-xl border transition-all font-medium ${isEditProfile ? 'bg-white border-blue-200' : 'bg-gray-50 border-transparent'}`}
                                 />
                             </div>
@@ -164,22 +278,22 @@ export default function ProfilePage() {
                             </div>
                             <div>
                                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">WhatsApp</label>
-                                <input 
+                                <input
                                     disabled={!isEditProfile}
                                     value={formData.phone}
-                                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                     className={`w-full p-4 rounded-xl border transition-all font-medium ${isEditProfile ? 'bg-white border-blue-200' : 'bg-gray-50 border-transparent'}`}
                                 />
                             </div>
                         </div>
 
                         {isEditProfile && (
-                            <button 
+                            <button
                                 onClick={handleUpdateProfile}
                                 disabled={loading}
                                 className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2"
                             >
-                                <Save size={18}/> {loading ? "Saving..." : "Save Changes"}
+                                <Save size={18} /> {loading ? "Saving..." : "Save Changes"}
                             </button>
                         )}
                     </div>
@@ -191,7 +305,7 @@ export default function ProfilePage() {
                             {!isEditPassword ? (
                                 <button onClick={() => setIsEditPassword(true)} className="text-blue-600 text-xs font-bold uppercase hover:underline">Change</button>
                             ) : (
-                                <button onClick={() => setIsEditPassword(false)} className="text-red-500"><X size={18}/></button>
+                                <button onClick={() => setIsEditPassword(false)} className="text-red-500"><X size={18} /></button>
                             )}
                         </div>
 
@@ -206,33 +320,33 @@ export default function ProfilePage() {
                         ) : (
                             <div className="space-y-4">
                                 <div className="relative">
-                                    <input 
-                                        type={showCurrent ? "text" : "password"} 
-                                        placeholder="Current Password" 
+                                    <input
+                                        type={showCurrent ? "text" : "password"}
+                                        placeholder="Current Password"
                                         className="w-full p-4 bg-gray-50 border border-blue-100 rounded-xl outline-none focus:bg-white"
-                                        onChange={(e) => setPasswords({...passwords, current: e.target.value})}
+                                        onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
                                     />
                                     <button onClick={() => setShowCurrent(!showCurrent)} className="absolute right-4 top-4 text-gray-400">
-                                        {showCurrent ? <EyeOff size={18}/> : <Eye size={18}/>}
+                                        {showCurrent ? <EyeOff size={18} /> : <Eye size={18} />}
                                     </button>
                                 </div>
                                 <div className="relative">
-                                    <input 
-                                        type={showNew ? "text" : "password"} 
-                                        placeholder="New Password" 
+                                    <input
+                                        type={showNew ? "text" : "password"}
+                                        placeholder="New Password"
                                         className="w-full p-4 bg-gray-50 border border-blue-100 rounded-xl outline-none focus:bg-white"
-                                        onChange={(e) => setPasswords({...passwords, new: e.target.value})}
+                                        onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
                                     />
                                     <button onClick={() => setShowNew(!showNew)} className="absolute right-4 top-4 text-gray-400">
-                                        {showNew ? <EyeOff size={18}/> : <Eye size={18}/>}
+                                        {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
                                     </button>
                                 </div>
-                                <input 
-                                    type="password" placeholder="Confirm New Password" 
+                                <input
+                                    type="password" placeholder="Confirm New Password"
                                     className="w-full p-4 bg-gray-50 border border-blue-100 rounded-xl outline-none focus:bg-white"
-                                    onChange={(e) => setPasswords({...passwords, confirm: e.target.value})}
+                                    onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
                                 />
-                                <button 
+                                <button
                                     onClick={handleChangePassword}
                                     disabled={loading}
                                     className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition"

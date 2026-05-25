@@ -1,91 +1,110 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { 
-  Calendar, Zap, CreditCard, ChevronDown 
+import React, { useState, useMemo } from "react";
+import {
+  Calendar,
+  Zap,
+  CreditCard,
+  ChevronDown
 } from "lucide-react";
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell 
+
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell
 } from "recharts";
+
 import { useRouter } from "next/navigation";
 
 import MainLayout from "@/components/layout/MainLayout";
 import Notifications from "@/components/Notifications";
 import ZapIcon from "@/components/ZapIcon";
 
-type User = {
-  id: number;
-  username: string;
-  email: string;
-  phone: string;
-};
+import { useAuth } from "@/hooks/useAuth";
+import { logoutUser } from "@/lib/logout";
 
 export default function YearlyReportPage() {
+
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [mounted, setMounted] = useState(false);
+
+  // AUTH
+  const {user} = useAuth();
+
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  
+
   const today = useMemo(() => new Date(), []);
+
   const currentMonth = today.getMonth();
+
   const currentYear = 2026;
-  
-  const [selectedYear, setSelectedYear] = useState(currentYear.toString());
+
+  const [selectedYear, setSelectedYear] = useState(
+    currentYear.toString()
+  );
+
   const [activeUnit, setActiveUnit] = useState<"cost" | "kwh">("cost");
 
-  const yearOptions = useMemo(() => ["2024", "2025", "2026", "2027", "2028", "2029", "2030"], []);
-  const monthLabels = useMemo(() => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], []);
+  const yearOptions = useMemo(
+    () => ["2024", "2025", "2026", "2027", "2028", "2029", "2030"],
+    []
+  );
 
-  useEffect(() => {
-    // FIX: Membungkus initialization dalam fungsi async untuk menghindari 'set-state-in-effect'
-    const initPage = async () => {
-      setMounted(true);
-      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-      
-      if (!token) {
-        router.push("/login");
-        return;
-      }
+  const monthLabels = useMemo(
+    () => [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec"
+    ],
+    []
+  );
 
-      try {
-        const res = await fetch("http://localhost:8000/api/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        setUser(data);
-      } catch {
-        localStorage.removeItem("token");
-        sessionStorage.removeItem("token");
-        router.push("/login");
-      }
-    };
+  // LOGOUT
+  const handleLogout = async () => {
 
-    initPage();
-  }, [router]);
+    await logoutUser();
 
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-    router.push("/login");
-  }, [router]);
+    router.replace("/login");
+  };
 
   const chartData = useMemo(() => {
+
     return monthLabels.map((month, index) => {
+
       const yearInt = parseInt(selectedYear);
-      
+
       let cost = 0;
+
       let kwh = 0;
 
-      const hasData = yearInt < currentYear || (yearInt === currentYear && index <= currentMonth);
+      const hasData =
+        yearInt < currentYear ||
+        (yearInt === currentYear && index <= currentMonth);
 
       if (hasData) {
+
         // Seed data stabil untuk VoltCore (Monitoring 1 Titik)
-        const baseValue = (Math.sin(index + yearInt) + 2) * 120000;
+        const baseValue =
+          (Math.sin(index + yearInt) + 2) * 120000;
+
         cost = Math.floor(baseValue) + 80000;
+
         kwh = Number((cost / 1500).toFixed(1));
       }
-      
+
       return {
         month: month,
         cost: cost,
@@ -93,21 +112,27 @@ export default function YearlyReportPage() {
         isFuture: !hasData
       };
     });
-    // FIX: Menambahkan monthLabels ke dependency array
+
   }, [selectedYear, currentMonth, currentYear, monthLabels]);
 
   const totals = useMemo(() => {
-    const totalCost = chartData.reduce((acc, curr) => acc + curr.cost, 0);
-    const totalKwh = chartData.reduce((acc, curr) => acc + curr.kwh, 0);
-    
+
+    const totalCost = chartData.reduce(
+      (acc, curr) => acc + curr.cost,
+      0
+    );
+
+    const totalKwh = chartData.reduce(
+      (acc, curr) => acc + curr.kwh,
+      0
+    );
+
     return {
       cost: totalCost.toLocaleString("id-ID"),
       kwh: totalKwh.toLocaleString("id-ID")
     };
-  }, [chartData]);
 
-  // Early return untuk menghindari hydration mismatch
-  if (!mounted) return null;
+  }, [chartData]);
 
   return (
     <MainLayout
@@ -122,8 +147,8 @@ export default function YearlyReportPage() {
           <div className="flex flex-wrap gap-3">
             <div className="relative flex items-center bg-white rounded-xl px-4 py-2 border border-gray-100 shadow-sm">
               <Calendar size={18} className="text-blue-600 mr-2" />
-              <select 
-                value={selectedYear} 
+              <select
+                value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
                 className="bg-transparent text-sm font-bold text-gray-700 outline-none appearance-none pr-6 cursor-pointer"
               >
@@ -161,14 +186,14 @@ export default function YearlyReportPage() {
               <p className="text-xs text-gray-400">Visualization for {selectedYear}</p>
             </div>
             <div className="flex p-1 bg-slate-100 rounded-lg">
-              <button 
-                onClick={() => setActiveUnit("cost")} 
+              <button
+                onClick={() => setActiveUnit("cost")}
                 className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-[10px] font-bold transition-all ${activeUnit === "cost" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400"}`}
               >
                 <CreditCard size={14} /> COST
               </button>
-              <button 
-                onClick={() => setActiveUnit("kwh")} 
+              <button
+                onClick={() => setActiveUnit("kwh")}
                 className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-[10px] font-bold transition-all ${activeUnit === "kwh" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400"}`}
               >
                 <Zap size={14} /> kWh
@@ -176,21 +201,21 @@ export default function YearlyReportPage() {
             </div>
           </div>
 
-          <div className="h-64 md:h-80 w-full"> 
+          <div className="h-64 md:h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="month" 
-                  axisLine={false} 
-                  tickLine={false} 
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
                   tick={{ fill: '#94a3b8', fontSize: 10 }}
                 />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
                   tick={{ fill: '#94a3b8', fontSize: 10 }}
-                  tickFormatter={(val) => activeUnit === "cost" ? `${val/1000}k` : val}
+                  tickFormatter={(val) => activeUnit === "cost" ? `${val / 1000}k` : val}
                 />
                 <Tooltip cursor={{ fill: '#f8fafc' }} />
                 <Bar dataKey={activeUnit} radius={[4, 4, 0, 0]} barSize={24}>

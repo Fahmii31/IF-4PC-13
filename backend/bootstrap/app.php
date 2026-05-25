@@ -7,6 +7,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Auth\AuthenticationException;
 
 return Application::configure(basePath: dirname(__DIR__))
+
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -15,28 +16,32 @@ return Application::configure(basePath: dirname(__DIR__))
     )
 
     ->withMiddleware(function (Middleware $middleware) {
+
+        $middleware->statefulApi();
+
         $middleware->alias([
             'auth' => \App\Http\Middleware\Authenticate::class,
         ]);
 
-        $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {
 
-        // VALIDATION ERROR (422)
         $exceptions->render(function (ValidationException $e, $request) {
+
             return response()->json([
                 'message' => 'Validation Failed',
                 'errors' => $e->errors()
             ], 422);
+
         });
 
-        // AUTH ERROR (401)
         $exceptions->render(function (AuthenticationException $e, $request) {
+
             return response()->json([
                 'message' => 'Unauthorized'
             ], 401);
+
         });
 
     })

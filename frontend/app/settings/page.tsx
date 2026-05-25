@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+
 import {
   Zap,
   Save,
@@ -8,84 +9,64 @@ import {
   Edit2,
   Lock,
 } from "lucide-react";
+
 import { useRouter } from "next/navigation";
 
 import MainLayout from "@/components/layout/MainLayout";
 import Notifications from "@/components/Notifications";
 
-type User = {
-  id: number;
-  username: string;
-  email: string;
-  phone: string;
-};
+import { useAuth } from "@/hooks/useAuth";
+import { logoutUser } from "@/lib/logout";
 
 export default function SettingsPage() {
+
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [mounted, setMounted] = useState(false);
+
+  // AUTH
+  const {user} = useAuth();
+
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   // Power Settings State
   const [meterCapacity, setMeterCapacity] = useState("1300 VA");
+
   const [wattLimit, setWattLimit] = useState(1200);
+
   const [costLimit, setCostLimit] = useState(750000);
 
   // Control State
   const [isEditing, setIsEditing] = useState(false);
 
-  useEffect(() => {
-    // FIX: Gunakan fungsi asinkron di dalam useEffect untuk menghindari peringatan 'set-state-in-effect'
-    const initializePage = async () => {
-      setMounted(true);
-      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+const handleVACapacityChange = (value: string) => {
+  const confirmChange = window.confirm(
+    "Are you sure you want to change the VA capacity? This action will reset your current limit configurations and usage history."
+  );
 
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
-      try {
-        const res = await fetch("http://localhost:8000/api/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        setUser(data);
-      } catch {
-        localStorage.removeItem("token");
-        sessionStorage.removeItem("token");
-        router.push("/login");
-      }
-    };
-
-    initializePage();
-  }, [router]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-    router.push("/login");
-  };
-
-  const handleVACapacityChange = (value: string) => {
-    const confirmChange = window.confirm(
-      "PERINGATAN: Mengubah kapasitas VA akan mereset semua limit konfigurasi dan riwayat (history) penggunaan Anda. Apakah Anda yakin ingin melanjutkan?"
+  if (confirmChange) {
+    setMeterCapacity(value);
+    alert(
+      "Configuration updated. The system has been successfully reset based on the new VA capacity."
     );
+  }
+};
 
-    if (confirmChange) {
-      setMeterCapacity(value);
-      alert("Sistem telah di-reset ulang sesuai kapasitas VA baru.");
-    }
+  const getBackgroundSize = (
+    val: number,
+    max: number
+  ) => {
+
+    return {
+      backgroundSize: `${(val * 100) / max}% 100%`
+    };
   };
 
-  const getBackgroundSize = (val: number, max: number) => {
-    return { backgroundSize: `${(val * 100) / max}% 100%` };
-  };
+  // LOGOUT
+  const handleLogout = async () => {
 
-  // FIX: Gunakan variabel 'mounted' agar tidak dideteksi sebagai 'unused-vars' oleh ESLint
-  if (!mounted) return null;
+    await logoutUser();
+
+    router.replace("/login");
+  };
 
   return (
     <MainLayout
@@ -159,7 +140,7 @@ export default function SettingsPage() {
             </div>
 
             <div className={`space-y-12 transition-all duration-300 ${!isEditing ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
-              
+
               {/* WATT LIMIT */}
               <div className="space-y-4 group">
                 <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-4">

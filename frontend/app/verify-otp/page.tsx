@@ -4,6 +4,7 @@ import LogoBlue from "@/components/LogoBlue";
 import { RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Cookies from "js-cookie";
 
 export default function VerifyOtpPage() {
   const router = useRouter();
@@ -25,76 +26,147 @@ export default function VerifyOtpPage() {
     return () => clearTimeout(timeoutId);
   }, [timer]);
 
-  const handleResend = async () => {
-    if (!email) return;
+ const handleResend = async () => {
 
-    setTimer(59);
-    setError("");
+  if (!email) return;
 
-    try {
-      const res = await fetch("http://localhost:8000/api/forgot-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
+  setTimer(59);
 
-      const data = await res.json();
+  setError("");
 
-      if (!res.ok) {
-        setError(data.message || "Failed to resend OTP");
-        return;
-      }
+  try {
 
-      alert(data.message || "OTP has been resent");
+    // CSRF COOKIE
+    await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+      credentials: "include",
+    });
 
-    } catch {
-      setError("Failed to resend OTP");
-    }
-  };
+    // TOKEN
+    const token = Cookies.get("XSRF-TOKEN");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+    // REQUEST
+    const res = await fetch("http://localhost:8000/forgot-password", {
 
-    if (!email) {
-      setError("Session expired. Please try again.");
-      router.push("/forgot-password");
+      method: "POST",
+
+      credentials: "include",
+
+      headers: {
+
+        "Content-Type": "application/json",
+
+        Accept: "application/json",
+
+        "X-Requested-With": "XMLHttpRequest",
+
+        "X-XSRF-TOKEN": decodeURIComponent(token || ""),
+
+      },
+
+      body: JSON.stringify({
+        email,
+      }),
+
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+
+      setError(data.message || "Failed to resend OTP");
+
       return;
     }
 
-    try {
-      const res = await fetch("http://localhost:8000/api/verify-otp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          otp,
-        }),
-      });
+    alert(data.message || "OTP has been resent");
 
-      const data = await res.json();
+  } catch (err) {
 
-      if (!res.ok) {
-        setError(data.message || "Invalid OTP");
-        return;
-      }
+    console.error(err);
 
-      localStorage.setItem("otpVerified", "true");
-      alert(data.message || "OTP successfully verified");
+    setError("Failed to resend OTP");
 
-      setOtp("");
-      setTimer(59); 
+  }
+};
 
-      router.push("/reset-password");
+  const handleSubmit = async (e: React.FormEvent) => {
 
-    } catch {
-      setError("Server error. Please try again later.");
+  e.preventDefault();
+
+  setError("");
+
+  if (!email) {
+
+    setError("Session expired. Please try again.");
+
+    router.push("/forgot-password");
+
+    return;
+  }
+
+  try {
+
+    // AMBIL CSRF COOKIE
+    await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+      credentials: "include",
+    });
+
+    // AMBIL TOKEN
+    const token = Cookies.get("XSRF-TOKEN");
+
+    // VERIFY OTP
+    const res = await fetch("http://localhost:8000/verify-otp", {
+
+      method: "POST",
+
+      credentials: "include",
+
+      headers: {
+
+        "Content-Type": "application/json",
+
+        Accept: "application/json",
+
+        "X-Requested-With": "XMLHttpRequest",
+
+        "X-XSRF-TOKEN": decodeURIComponent(token || ""),
+
+      },
+
+      body: JSON.stringify({
+        email,
+        otp,
+      }),
+
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+
+      setError(data.message || "Invalid OTP");
+
+      return;
     }
-  };
+
+    localStorage.setItem("otpVerified", "true");
+
+    alert(data.message || "OTP successfully verified");
+
+    setOtp("");
+
+    setTimer(59);
+
+    router.push("/reset-password");
+
+  } catch (err) {
+
+    console.error(err);
+
+    setError("Server error. Please try again later.");
+
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-200 p-6">

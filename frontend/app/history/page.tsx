@@ -1,22 +1,21 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
+
 import {
   Calendar,
   FileSpreadsheet,
   ChevronDown,
 } from "lucide-react";
+
 import { useRouter } from "next/navigation";
+
 import MainLayout from "@/components/layout/MainLayout";
 import Notifications from "@/components/Notifications";
 import ExportExcel from "@/components/ExportExcel";
 
-type User = {
-  id: number;
-  username: string;
-  email: string;
-  phone: string;
-};
+import { useAuth } from "@/hooks/useAuth";
+import { logoutUser } from "@/lib/logout";
 
 interface UsageRecord {
   date: string;
@@ -28,42 +27,25 @@ interface UsageRecord {
 }
 
 export default function HistoryPage() {
+
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+
+  // AUTH
+  const {user} = useAuth();
+
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+
   const [showExportModal, setShowExportModal] = useState(false);
+
   const [visibleRecords, setVisibleRecords] = useState(8);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+// LOGOUT
+const handleLogout = async () => {
 
-    if (!token) {
-      router.push("/login");
-      return;
-    }
+  await logoutUser();
 
-    fetch("http://localhost:8000/api/me", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        setUser(data);
-      })
-      .catch(() => {
-        localStorage.removeItem("token");
-        sessionStorage.removeItem("token");
-        router.push("/login");
-      });
-  }, [router]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-    router.push("/login");
-  };
+  router.replace("/login");
+};
 
   const consumptionData: UsageRecord[] = [
     {
@@ -109,6 +91,7 @@ export default function HistoryPage() {
   ];
 
   const handleLoadMore = () => {
+
     setVisibleRecords((prev) => prev + 5);
   };
 

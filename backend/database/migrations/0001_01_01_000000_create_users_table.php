@@ -12,10 +12,14 @@ return new class extends Migration {
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('username');
+            $table->string('username')->unique();
             $table->string('email')->unique();
             $table->string('password');
             $table->string('phone');
+            $table->string('provider')->default('local');
+            $table->string('provider_id')->nullable();
+            $table->boolean('is_google_user')->default(false);
+            $table->rememberToken();
             $table->timestamps();
         });
     }

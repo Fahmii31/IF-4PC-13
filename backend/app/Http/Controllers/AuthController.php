@@ -6,6 +6,9 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Otp;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\OtpMail;
 
 class AuthController extends Controller
 {
@@ -14,13 +17,16 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'username' => 'required|string|max:20',
-            'email' => 'required|email|ends_with:@gmail.com|unique:users',
+
+            'email' => 'required|email|ends_with:gmail.com|unique:users',
+
             'password' => [
                 'required',
                 'min:8',
                 'regex:/[A-Z]/',
                 'regex:/[0-9]/'
             ],
+
             'phone' => 'required'
         ], [
             // username
@@ -60,40 +66,55 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'username' => 'required',
-            'password' => 'required'
+            'password' => 'required',
         ]);
 
-        $user = User::where('username', $validated['username'])->first();
+        $remember = $request->boolean('remember');
 
-        if (!$user || !Hash::check($validated['password'], $user->password)) {
+        $credentials = [
+            'username' => $validated['username'],
+            'password' => $validated['password'],
+        ];
+
+        // AUTH ATTEMPT
+        if (!Auth::attempt($credentials, $remember)) {
+
             return response()->json([
                 'message' => 'Invalid username or password'
             ], 401);
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // REGENERATE SESSION
+        $request->session()->regenerate();
 
         return response()->json([
             'message' => 'Login success',
-            'token' => $token,
-            'user' => $user
+            'user' => Auth::user(),
         ]);
     }
 
     // LOGOUT
-    public function logout(Request $request)
-    {
-        $user = $request->user();
+   public function logout(Request $request)
+{
+    $user = $request->user();
 
-        if ($user && $user->currentAccessToken()) {
-            $user->currentAccessToken()->delete();
-        }
+    if ($user) {
 
-        return response()->json([
-            'message' => 'Logout success'
-        ]);
+        $user->setRememberToken(null);
+
+        $user->save();
     }
 
+    Auth::guard('web')->logout();
+
+    $request->session()->invalidate();
+
+    $request->session()->regenerateToken();
+
+    return response()->json([
+        'message' => 'Logout success'
+    ]);
+}
     // FORGOT PASSWORD
     public function forgotPassword(Request $request)
     {
@@ -104,27 +125,47 @@ class AuthController extends Controller
         $user = User::where('email', $validated['email'])->first();
 
         if (!$user) {
+
             return response()->json([
                 'message' => 'Email not found'
             ], 404);
+
         }
 
-        $otp = rand(100000, 999999);
+        // GENERATE OTP 6 DIGIT
+        $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
 
+        // SIMPAN / UPDATE OTP
         Otp::updateOrCreate(
+
             ['email' => $validated['email']],
+
             [
                 'otp' => $otp,
                 'expired_at' => now()->addMinutes(5),
                 'is_verified' => false
             ]
+
         );
 
-        \Log::info("OTP {$validated['email']}: $otp");
+        try {
 
-        return response()->json([
-            'message' => 'OTP sent to email'
-        ]);
+            // KIRIM EMAIL
+            Mail::to($validated['email'])
+                ->send(new OtpMail($otp));
+
+            return response()->json([
+                'message' => 'OTP sent to email'
+            ]);
+
+        } catch (\Exception $e) {
+
+            return response()->json([
+                'message' => 'Failed to send OTP email',
+                'error' => $e->getMessage()
+            ], 500);
+
+        }
     }
 
     // VERIFY OTP
@@ -162,110 +203,125 @@ class AuthController extends Controller
 
     // RESET PASSWORD
     public function resetPassword(Request $request)
-{
-    $validated = $request->validate([
-        'email' => 'required|email',
-        'password' => [
-            'required',
-            'min:8',
-            'regex:/[A-Z]/',
-            'regex:/[0-9]/'
-        ]
-    ], [
-        'email.required' => 'Email is required',
-        'email.email' => 'Invalid email format',
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+            'password' => [
+                'required',
+                'min:8',
+                'regex:/[A-Z]/',
+                'regex:/[0-9]/'
+            ]
+        ], [
+            'email.required' => 'Email is required',
+            'email.email' => 'Invalid email format',
 
-        'password.required' => 'Password is required',
-        'password.min' => 'Password must be at least 8 characters',
-        'password.regex' => 'Password must contain at least one uppercase letter and one number'
-    ]);
+            'password.required' => 'Password is required',
+            'password.min' => 'Password must be at least 8 characters',
+            'password.regex' => 'Password must contain at least one uppercase letter and one number'
+        ]);
 
-    $user = User::where('email', $validated['email'])->first();
+        $user = User::where('email', $validated['email'])->first();
 
-    if (!$user) {
+        if (!$user) {
+            return response()->json([
+                'message' => 'User not found'
+            ], 404);
+        }
+
+        $otp = Otp::where('email', $validated['email'])
+            ->where('is_verified', true)
+            ->first();
+
+        if (!$otp) {
+            return response()->json([
+                'message' => 'OTP is not verified'
+            ], 400);
+        }
+
+        if (Hash::check($validated['password'], $user->password)) {
+            return response()->json([
+                'message' => 'New password cannot be the same as the old password'
+            ], 400);
+        }
+
+        $user->update([
+            'password' => Hash::make($validated['password'])
+        ]);
+
+        $otp->delete();
+
         return response()->json([
-            'message' => 'User not found'
-        ], 404);
+            'message' => 'Password has been successfully updated'
+        ]);
     }
 
-    $otp = Otp::where('email', $validated['email'])
-        ->where('is_verified', true)
-        ->first();
+    // Update Profile (Hanya Username & Phone)
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+        $validated = $request->validate([
+            'username' => 'required|string|max:20|unique:users,username,' . $user->id,
+            'phone' => 'required|numeric'
+        ]);
 
-    if (!$otp) {
+        $user->update($validated);
+
         return response()->json([
-            'message' => 'OTP is not verified'
-        ], 400);
+            'status' => 'success',
+            'message' => 'Profile updated successfully',
+            'user' => $user
+        ]);
     }
 
-    if (Hash::check($validated['password'], $user->password)) {
+    // Change Password (Logout setelah sukses)
+    // Change Password (Logout setelah sukses)
+    public function changePassword(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'current_password' => 'required',
+            'new_password' => [
+                'required',
+                'min:8',
+                'regex:/[A-Z]/',
+                'regex:/[0-9]/'
+            ],
+        ], [
+            'new_password.min' => 'Password must be at least 8 characters',
+            'new_password.regex' => 'Password must contain at least one uppercase letter and one number'
+        ]);
+
+        // cek password lama
+        if (!Hash::check($request->current_password, $user->password)) {
+
+            return response()->json([
+                'message' => 'Current password incorrect'
+            ], 400);
+        }
+
+        // password baru tidak boleh sama
+        if (Hash::check($request->new_password, $user->password)) {
+
+            return response()->json([
+                'message' => 'New password cannot be the same as the old one'
+            ], 400);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->new_password)
+        ]);
+
+        // logout session
+        Auth::guard('web')->logout();
+
+        $request->session()->invalidate();
+
+        $request->session()->regenerateToken();
+
         return response()->json([
-            'message' => 'New password cannot be the same as the old password'
-        ], 400);
+            'message' => 'Password updated. Please login again.'
+        ]);
     }
-
-    $user->update([
-        'password' => Hash::make($validated['password'])
-    ]);
-
-    $otp->delete();
-
-    return response()->json([
-        'message' => 'Password has been successfully updated'
-    ]);
-}
-
-// Update Profile (Hanya Username & Phone)
-public function updateProfile(Request $request)
-{
-    $user = $request->user();
-    $validated = $request->validate([
-        'username' => 'required|string|max:20|unique:users,username,' . $user->id,
-        'phone' => 'required|numeric'
-    ]);
-
-    $user->update($validated);
-
-    return response()->json([
-        'status' => 'success',
-        'message' => 'Profile updated successfully',
-        'user' => $user
-    ]);
-}
-
-// Change Password (Logout setelah sukses)
-public function changePassword(Request $request)
-{
-    $user = $request->user();
-    
-    $request->validate([
-        'current_password' => 'required',
-        'new_password' => [
-            'required',
-            'min:8',
-            'regex:/[A-Z]/',
-            'regex:/[0-9]/'
-        ],
-    ], [
-        'new_password.min' => 'Password must be at least 8 characters',
-        'new_password.regex' => 'Password must contain at least one uppercase letter and one number'
-    ]);
-
-    // Cek password lama
-    if (!Hash::check($request->current_password, $user->password)) {
-        return response()->json(['message' => 'Current password incorrect'], 400);
-    }
-
-    // Cek agar tidak sama dengan password lama
-    if (Hash::check($request->new_password, $user->password)) {
-        return response()->json(['message' => 'New password cannot be the same as the old one'], 400);
-    }
-
-    $user->update(['password' => Hash::make($request->new_password)]);
-    
-    // Revoke token agar user harus login ulang
-    $user->tokens()->delete();
-
-    return response()->json(['message' => 'Password updated. Please login again.']);
-}
 }
