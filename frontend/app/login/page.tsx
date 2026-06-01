@@ -6,9 +6,9 @@ import { User, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginUser, getAuthUser } from "@/lib/auth";
+import Image from "next/image";
 
 export default function LoginPage() {
-
   const router = useRouter();
 
   const [showPassword, setShowPassword] = useState(false);
@@ -23,7 +23,6 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-
     const { name, value } = e.target;
 
     setFormData((prev) => ({
@@ -35,53 +34,42 @@ export default function LoginPage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  e.preventDefault();
+    setError("");
 
-  setError("");
+    try {
+      // LOGIN
+      const res = await loginUser({
+        username: formData.username,
+        password: formData.password,
+        remember: remember,
+      });
 
-  try {
+      const data = await res.json();
 
-    // LOGIN
-    const res = await loginUser({
-      username: formData.username,
-      password: formData.password,
-      remember: remember,
-    });
+      if (!res.ok) {
+        setError(data.message || "Login failed");
+        return;
+      }
 
-    const data = await res.json();
+      // PRELOAD USER
+      const user = await getAuthUser();
 
-    if (!res.ok) {
+      // CACHE USER
+      sessionStorage.setItem("auth_user", JSON.stringify(user));
 
-      setError(data.message || "Login failed");
-
-      return;
+      // REDIRECT
+      router.replace("/dashboard");
+    } catch (error) {
+      console.error(error);
+      setError("Cannot connect to server");
     }
-
-    // PRELOAD USER
-const user = await getAuthUser();
-
-// CACHE USER
-sessionStorage.setItem(
-  "auth_user",
-  JSON.stringify(user)
-);
-
-// REDIRECT
-router.replace("/dashboard");
-
-  } catch (error) {
-
-    console.error(error);
-
-    setError("Cannot connect to server");
-  }
-};
+  };
 
   return (
     <AuthLayout>
       <div className="w-full max-w-md mx-auto px-1 sm:px-0">
-
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-2 leading-tight">
           Sign in to your account
         </h2>
@@ -91,13 +79,10 @@ router.replace("/dashboard");
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
-
           {/* USERNAME */}
           <div className="relative">
             <div className="flex justify-between items-center mb-1">
-              <label className="text-sm text-gray-600">
-                Username
-              </label>
+              <label className="text-sm text-gray-600">Username</label>
             </div>
 
             <div className="relative">
@@ -109,7 +94,6 @@ router.replace("/dashboard");
                 onChange={handleChange}
                 className="w-full h-12 sm:h-14 px-4 pr-10 rounded-xl bg-gray-100 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
-
               <User
                 size={18}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -120,10 +104,7 @@ router.replace("/dashboard");
           {/* PASSWORD */}
           <div className="relative">
             <div className="flex justify-between items-center mb-1">
-              <label className="text-sm text-gray-600">
-                Password
-              </label>
-
+              <label className="text-sm text-gray-600">Password</label>
               <Link
                 href="/forgot-password"
                 className="text-blue-600 text-xs font-semibold hover:underline"
@@ -141,7 +122,6 @@ router.replace("/dashboard");
                 onChange={handleChange}
                 className="w-full h-12 sm:h-14 px-4 pr-10 rounded-xl bg-gray-100 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
-
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
@@ -153,7 +133,7 @@ router.replace("/dashboard");
           </div>
 
           {/* REMEMBER */}
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-sm pt-1">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -161,10 +141,7 @@ router.replace("/dashboard");
                 onChange={(e) => setRemember(e.target.checked)}
                 className="w-4 h-4 accent-blue-600 cursor-pointer"
               />
-
-              <span className="text-gray-600">
-                Remember me
-              </span>
+              <span className="text-gray-600">Remember me</span>
             </label>
           </div>
 
@@ -175,15 +152,42 @@ router.replace("/dashboard");
             </div>
           )}
 
+          {/* LOGIN BUTTON */}
           <button
             type="submit"
-            className="w-full h-12 sm:h-14 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition duration-200 shadow-md active:scale-[0.98]"
+            className="w-full h-12 sm:h-14 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition duration-200 shadow-md active:scale-[0.98] mt-2"
           >
             Sign In
           </button>
+
+          {/* LAYOUT POSITIONING: SEPARATOR DIVISION */}
+          <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-gray-200"></div>
+            <span className="flex-shrink mx-4 text-xs text-gray-400 font-bold uppercase tracking-wider">
+              Or
+            </span>
+            <div className="flex-grow border-t border-gray-200"></div>
+          </div>
+
+          {/* GOOGLE LOGIN */}
+          <button
+            type="button"
+            onClick={() => {
+              window.location.href = "http://localhost:8000/auth/google";
+            }}
+            className="w-full h-12 sm:h-14 border border-gray-300 bg-white text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition duration-200 flex items-center justify-center gap-3"
+          >
+            <Image
+              src="https://www.svgrepo.com/show/475656/google-color.svg"
+              alt="Google"
+              width={20}
+              height={20}
+            />
+            Continue with Google
+          </button>
         </form>
 
-        <p className="text-center mt-6 sm:mt-8 text-sm text-gray-500">
+        <p className="text-center mt-8 text-sm text-gray-500">
           Don&apos;t have an account?{" "}
           <Link
             href="/register"

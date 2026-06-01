@@ -9,104 +9,72 @@ import Cookies from "js-cookie";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
-
   const [email, setEmail] = useState("");
-
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
 
-const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  e.preventDefault();
+    setError("");
+    setSuccess("");
+    setLoading(true);
 
-  setError("");
-  setSuccess("");
+    try {
+      // AMBIL CSRF COOKIE
+      await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+        credentials: "include",
+      });
+      // AMBIL TOKEN DARI COOKIE
+      const token = Cookies.get("XSRF-TOKEN");
+      // REQUEST
+      const res = await fetch("http://localhost:8000/forgot-password", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          "X-XSRF-TOKEN": decodeURIComponent(token || ""),
+        },
+        body: JSON.stringify({
+          email,
+        }),
+      });
 
-  try {
+      const data = await res.json();
 
-    // AMBIL CSRF COOKIE
-    await fetch("http://localhost:8000/sanctum/csrf-cookie", {
-      credentials: "include",
-    });
-
-    // AMBIL TOKEN DARI COOKIE
-    const token = Cookies.get("XSRF-TOKEN");
-
-    // REQUEST
-    const res = await fetch("http://localhost:8000/forgot-password", {
-
-      method: "POST",
-
-      credentials: "include",
-
-      headers: {
-
-        "Content-Type": "application/json",
-
-        Accept: "application/json",
-
-        "X-Requested-With": "XMLHttpRequest",
-
-        "X-XSRF-TOKEN": decodeURIComponent(token || ""),
-
-      },
-
-      body: JSON.stringify({
-        email,
-      }),
-
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-
-      if (res.status === 422 && data.errors) {
-
-        setError(
-          Object.values(data.errors).flat().join(", ")
-        );
-
-      } else {
-
-        setError(data.message || "Something went wrong");
-
+      if (!res.ok) {
+        if (res.status === 422 && data.errors) {
+          setError(Object.values(data.errors).flat().join(", "));
+        } else {
+          setError(data.message || "Something went wrong");
+        }
+        return;
       }
 
-      return;
+      setSuccess(data.message || "OTP has been sent");
+
+      setTimeout(() => {
+        router.push("/verify-otp");
+      }, 1200);
+    } catch (err) {
+      console.error(err);
+      setError("Cannot connect to server");
+    } finally {
+      setLoading(false);
     }
-
-    setSuccess(data.message || "OTP has been sent");
-
-    localStorage.setItem("resetEmail", email);
-
-    setTimeout(() => {
-
-      router.push("/verify-otp");
-
-    }, 1200);
-
-  } catch (err) {
-
-    console.error(err);
-
-    setError("Cannot connect to server");
-
-  }
-};
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-200 px-4 py-8 sm:p-6">
-
       <div className="w-full max-w-md bg-white rounded-[2rem] shadow-2xl p-6 sm:p-8">
-
         {/* LOGO + TEXT */}
         <div className="flex flex-col items-center mb-6">
           <LogoBlue />
 
-          <h1 className="text-blue-600 font-bold text-xl mt-3">
-            VoltCore
-          </h1>
+          <h1 className="text-blue-600 font-bold text-xl mt-3">VoltCore</h1>
 
           <p className="text-xs tracking-widest text-gray-500">
             POWER INTELLIGENCE
@@ -119,11 +87,11 @@ const handleSubmit = async (e: React.FormEvent) => {
         </h2>
 
         <p className="text-center text-gray-500 mb-6 text-sm">
-          Don’t worry. Enter your email address and we will send you recovery instructions.
+          Don’t worry. Enter your email address and we will send you recovery
+          instructions.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-
           <div className="relative">
             <label className="text-sm text-gray-600 mb-1 block">
               Email Address
@@ -144,7 +112,10 @@ const handleSubmit = async (e: React.FormEvent) => {
               ${error ? "ring-2 ring-yellow-400" : "focus:ring-blue-500"}`}
             />
 
-            <Mail className="absolute right-3 top-[42px] text-gray-400" size={18} />
+            <Mail
+              className="absolute right-3 top-[42px] text-gray-400"
+              size={18}
+            />
           </div>
 
           {/* ERROR MESSAGE */}
@@ -163,8 +134,9 @@ const handleSubmit = async (e: React.FormEvent) => {
 
           <button
             type="submit"
+            disabled={loading}
             className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold 
-            hover:bg-blue-700 transition shadow-md active:scale-[0.98]"
+            hover:bg-blue-700 transition shadow-md active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             CONFIRM
           </button>
@@ -180,7 +152,6 @@ const handleSubmit = async (e: React.FormEvent) => {
             Back to Sign In
           </Link>
         </div>
-
       </div>
     </div>
   );

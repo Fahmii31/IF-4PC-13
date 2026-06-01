@@ -8,176 +8,152 @@ import Cookies from "js-cookie";
 
 export default function VerifyOtpPage() {
   const router = useRouter();
-
   const [otp, setOtp] = useState("");
   const [timer, setTimer] = useState(59);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const canResend = timer <= 0;
 
-  const email =
-    typeof window !== "undefined"
-      ? localStorage.getItem("resetEmail")
-      : null;
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/reset-session", {
+          credentials: "include",
+        });
+
+        const data = await res.json();
+
+        if (!data.valid) {
+          router.push("/forgot-password");
+        }
+      } catch {
+        router.push("/forgot-password");
+      }
+    };
+
+    checkSession();
+  }, [router]);
 
   useEffect(() => {
     if (timer <= 0) return;
 
-    const timeoutId = setTimeout(() => setTimer(timer - 1), 1000);
+    const timeoutId = setTimeout(() => {
+      setTimer(timer - 1);
+    }, 1000);
+
     return () => clearTimeout(timeoutId);
   }, [timer]);
 
- const handleResend = async () => {
+  const handleResend = async () => {
+    if (!canResend) return;
 
-  if (!email) return;
-
-  setTimer(59);
-
-  setError("");
-
-  try {
-
-    // CSRF COOKIE
-    await fetch("http://localhost:8000/sanctum/csrf-cookie", {
-      credentials: "include",
-    });
-
-    // TOKEN
-    const token = Cookies.get("XSRF-TOKEN");
-
-    // REQUEST
-    const res = await fetch("http://localhost:8000/forgot-password", {
-
-      method: "POST",
-
-      credentials: "include",
-
-      headers: {
-
-        "Content-Type": "application/json",
-
-        Accept: "application/json",
-
-        "X-Requested-With": "XMLHttpRequest",
-
-        "X-XSRF-TOKEN": decodeURIComponent(token || ""),
-
-      },
-
-      body: JSON.stringify({
-        email,
-      }),
-
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-
-      setError(data.message || "Failed to resend OTP");
-
-      return;
-    }
-
-    alert(data.message || "OTP has been resent");
-
-  } catch (err) {
-
-    console.error(err);
-
-    setError("Failed to resend OTP");
-
-  }
-};
-
-  const handleSubmit = async (e: React.FormEvent) => {
-
-  e.preventDefault();
-
-  setError("");
-
-  if (!email) {
-
-    setError("Session expired. Please try again.");
-
-    router.push("/forgot-password");
-
-    return;
-  }
-
-  try {
-
-    // AMBIL CSRF COOKIE
-    await fetch("http://localhost:8000/sanctum/csrf-cookie", {
-      credentials: "include",
-    });
-
-    // AMBIL TOKEN
-    const token = Cookies.get("XSRF-TOKEN");
-
-    // VERIFY OTP
-    const res = await fetch("http://localhost:8000/verify-otp", {
-
-      method: "POST",
-
-      credentials: "include",
-
-      headers: {
-
-        "Content-Type": "application/json",
-
-        Accept: "application/json",
-
-        "X-Requested-With": "XMLHttpRequest",
-
-        "X-XSRF-TOKEN": decodeURIComponent(token || ""),
-
-      },
-
-      body: JSON.stringify({
-        email,
-        otp,
-      }),
-
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-
-      setError(data.message || "Invalid OTP");
-
-      return;
-    }
-
-    localStorage.setItem("otpVerified", "true");
-
-    alert(data.message || "OTP successfully verified");
-
-    setOtp("");
+    setError("");
 
     setTimer(59);
 
-    router.push("/reset-password");
+    try {
+      await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+        credentials: "include",
+      });
 
-  } catch (err) {
+      const token = Cookies.get("XSRF-TOKEN");
 
-    console.error(err);
+      const res = await fetch("http://localhost:8000/forgot-password", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          "X-XSRF-TOKEN": decodeURIComponent(token || ""),
+        },
 
-    setError("Server error. Please try again later.");
+        body: JSON.stringify({}),
+      });
 
-  }
-};
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.message || "Failed to resend OTP");
+
+        return;
+      }
+
+      alert(data.message || "OTP has been resent");
+    } catch (err) {
+      console.error(err);
+
+      setError("Failed to resend OTP");
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    setError("");
+
+    setLoading(true);
+
+    try {
+      await fetch("http://localhost:8000/sanctum/csrf-cookie", {
+        credentials: "include",
+      });
+
+      const token = Cookies.get("XSRF-TOKEN");
+
+      const res = await fetch("http://localhost:8000/verify-otp", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          "X-XSRF-TOKEN": decodeURIComponent(token || ""),
+        },
+
+        body: JSON.stringify({
+          otp,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.message || "Invalid OTP");
+
+        return;
+      }
+
+      alert(data.message || "OTP successfully verified");
+
+      setOtp("");
+
+      router.push("/reset-password");
+    } catch (err) {
+      console.error(err);
+
+      setError("Server error. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-200 p-6">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8">
         <div className="flex flex-col items-center mb-6">
           <LogoBlue />
-          <h1 className="text-blue-600 font-bold text-lg sm:text-xl mt-3">VoltCore</h1>
-          <p className="text-xs tracking-widest text-gray-500">POWER INTELLIGENCE</p>
+          <h1 className="text-blue-600 font-bold text-lg sm:text-xl mt-3">
+            VoltCore
+          </h1>
+          <p className="text-xs tracking-widest text-gray-500">
+            POWER INTELLIGENCE
+          </p>
         </div>
 
-        <h2 className="text-lg sm:text-xl font-semibold text-center text-gray-900 mb-2">Verify Email</h2>
+        <h2 className="text-lg sm:text-xl font-semibold text-center text-gray-900 mb-2">
+          Verify Email
+        </h2>
         <p className="text-center text-gray-500 mb-8 text-sm">
           Enter the 6-digit code we sent to your email.
         </p>
@@ -214,10 +190,10 @@ export default function VerifyOtpPage() {
 
           <button
             type="submit"
-            disabled={otp.length !== 6}
+            disabled={otp.length !== 6 || loading}
             className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition shadow-md active:scale-[0.98] disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
-            CONFIRM
+            {loading ? "Verifying..." : "CONFIRM"}
           </button>
         </form>
 
@@ -228,7 +204,8 @@ export default function VerifyOtpPage() {
               onClick={handleResend}
               className="flex items-center gap-2 text-blue-600 font-semibold hover:underline text-sm"
             >
-              <RefreshCw size={16} /> Resend Code
+              <RefreshCw size={16} />
+              Resend Code
             </button>
           ) : (
             <p className="text-gray-400 text-sm">

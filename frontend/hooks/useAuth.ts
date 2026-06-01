@@ -11,6 +11,7 @@ type User = {
   username: string;
   email: string;
   phone: string;
+  is_google_user: boolean;
 };
 
 export function useAuth() {
