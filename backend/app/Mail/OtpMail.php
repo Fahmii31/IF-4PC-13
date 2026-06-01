@@ -2,12 +2,18 @@
 
 namespace App\Mail;
 
+use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Mailable;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 
-class OtpMail extends Mailable
+class OtpMail extends Mailable implements ShouldQueue
 {
+    use Queueable, SerializesModels;
+
     public $otp;
 
     public function __construct($otp)
@@ -18,13 +24,14 @@ class OtpMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            from: new \Illuminate\Mail\Mailables\Address(
+
+            from: new Address(
                 env('MAIL_FROM_ADDRESS'),
                 'VoltCore'
             ),
 
             replyTo: [
-                new \Illuminate\Mail\Mailables\Address(
+                new Address(
                     env('MAIL_FROM_ADDRESS'),
                     'VoltCore Support'
                 )

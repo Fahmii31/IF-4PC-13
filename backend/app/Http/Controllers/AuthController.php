@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\OtpMail;
+use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
 {
@@ -29,22 +30,18 @@ class AuthController extends Controller
 
             'phone' => 'required'
         ], [
-            // username
             'username.required' => 'Username is required',
             'username.max' => 'Username must not exceed 20 characters',
 
-            // email
             'email.required' => 'Email is required',
             'email.email' => 'Invalid email format',
             'email.ends_with' => 'Email must use @gmail.com domain',
             'email.unique' => 'Email is already registered',
 
-            // password
             'password.required' => 'Password is required',
             'password.min' => 'Password must be at least 8 characters',
             'password.regex' => 'Password must contain at least one uppercase letter and one number',
 
-            // phone
             'phone.required' => 'Phone number is required'
         ]);
 
@@ -69,6 +66,26 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
+        $user = User::where(
+            'username',
+            $validated['username']
+        )->first();
+
+        if (!$user) {
+
+            return response()->json([
+                'message' => 'Invalid username or password'
+            ], 401);
+        }
+
+        // JIKA AKUN GOOGLE MURNI
+        if ($user->is_google_user) {
+
+            return response()->json([
+                'message' => 'This account uses Google Sign-In'
+            ], 400);
+        }
+
         $remember = $request->boolean('remember');
 
         $credentials = [
@@ -76,7 +93,6 @@ class AuthController extends Controller
             'password' => $validated['password'],
         ];
 
-        // AUTH ATTEMPT
         if (!Auth::attempt($credentials, $remember)) {
 
             return response()->json([
@@ -84,7 +100,6 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // REGENERATE SESSION
         $request->session()->regenerate();
 
         return response()->json([
@@ -94,27 +109,21 @@ class AuthController extends Controller
     }
 
     // LOGOUT
-   public function logout(Request $request)
-{
-    $user = $request->user();
+    public function logout(Request $request)
+    {
+        $user = $request->user();
 
-    if ($user) {
-
-        $user->setRememberToken(null);
-
-        $user->save();
+        if ($user) {
+            $user->setRememberToken(null);
+            $user->save();
+        }
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        return response()->json([
+            'message' => 'Logout success'
+        ]);
     }
-
-    Auth::guard('web')->logout();
-
-    $request->session()->invalidate();
-
-    $request->session()->regenerateToken();
-
-    return response()->json([
-        'message' => 'Logout success'
-    ]);
-}
     // FORGOT PASSWORD
     public function forgotPassword(Request $request)
     {
@@ -122,37 +131,60 @@ class AuthController extends Controller
             'email' => 'required|email'
         ]);
 
-        $user = User::where('email', $validated['email'])->first();
+        $user = User::where(
+            'email',
+            $validated['email']
+        )->first();
 
         if (!$user) {
 
             return response()->json([
                 'message' => 'Email not found'
             ], 404);
-
         }
 
-        // GENERATE OTP 6 DIGIT
-        $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+        // GOOGLE ACCOUNT
+        if ($user->is_google_user) {
 
-        // SIMPAN / UPDATE OTP
+            return response()->json([
+                'message' => 'This account uses Google Sign-In'
+            ], 400);
+        }
+
+        // SIMPAN EMAIL KE SESSION
+        session([
+            'password_reset_email' =>
+                $validated['email']
+        ]);
+
+        // GENERATE OTP
+        $otp = str_pad(
+            random_int(0, 999999),
+            6,
+            '0',
+            STR_PAD_LEFT
+        );
+
+        // SIMPAN OTP HASH
         Otp::updateOrCreate(
 
-            ['email' => $validated['email']],
+            [
+                'email' => $validated['email']
+            ],
 
             [
-                'otp' => $otp,
+                'otp' => Hash::make($otp),
                 'expired_at' => now()->addMinutes(5),
-                'is_verified' => false
+                'is_verified' => false,
+                'attempts' => 0,
+                'locked_until' => null
             ]
-
         );
 
         try {
 
-            // KIRIM EMAIL
             Mail::to($validated['email'])
-                ->send(new OtpMail($otp));
+                ->queue(new OtpMail($otp));
 
             return response()->json([
                 'message' => 'OTP sent to email'
@@ -160,11 +192,15 @@ class AuthController extends Controller
 
         } catch (\Exception $e) {
 
-            return response()->json([
-                'message' => 'Failed to send OTP email',
-                'error' => $e->getMessage()
-            ], 500);
+            \Log::error(
+                'OTP MAIL ERROR: ' .
+                $e->getMessage()
+            );
 
+            return response()->json([
+                'message' =>
+                    'Failed to send OTP email'
+            ], 500);
         }
     }
 
@@ -172,40 +208,117 @@ class AuthController extends Controller
     public function verifyOtp(Request $request)
     {
         $validated = $request->validate([
-            'email' => 'required|email',
-            'otp' => 'required'
+            'otp' => 'required|digits:6'
         ]);
 
-        $record = Otp::where('email', $validated['email'])
-            ->where('otp', $validated['otp'])
-            ->first();
+        // AMBIL EMAIL DARI SESSION
+        $email = session(
+            'password_reset_email'
+        );
+
+        if (!$email) {
+
+            return response()->json([
+                'message' => 'Session expired'
+            ], 403);
+        }
+
+        $record = Otp::where(
+            'email',
+            $email
+        )->first();
 
         if (!$record) {
+
             return response()->json([
                 'message' => 'OTP invalid'
             ], 400);
         }
 
+        // CEK LOCK
+        if (
+            $record->locked_until &&
+            now()->lt($record->locked_until)
+        ) {
+
+            return response()->json([
+                'message' =>
+                    'Too many attempts. Please try again later.'
+            ], 429);
+        }
+
+        // OTP SUDAH DIGUNAKAN
+        if ($record->is_verified) {
+
+            return response()->json([
+                'message' => 'OTP already used'
+            ], 400);
+        }
+
+        // OTP EXPIRED
         if (now()->gt($record->expired_at)) {
+
             return response()->json([
                 'message' => 'OTP expired'
             ], 400);
         }
 
+        // CEK HASH OTP
+        if (
+            !Hash::check(
+                $validated['otp'],
+                $record->otp
+            )
+        ) {
+
+            $record->increment('attempts');
+
+            if (($record->attempts + 1) >= 5) {
+
+                $record->update([
+                    'locked_until' =>
+                        now()->addMinutes(10)
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'OTP invalid'
+            ], 400);
+        }
+
+        // VERIFY OTP
         $record->update([
-            'is_verified' => true
+            'is_verified' => true,
+            'attempts' => 0,
+            'locked_until' => null
+        ]);
+
+        // SESSION VERIFIED
+        session([
+            'otp_verified' => true
         ]);
 
         return response()->json([
-            'message' => 'OTP successfully verified'
+            'message' =>
+                'OTP successfully verified'
         ]);
     }
 
     // RESET PASSWORD
     public function resetPassword(Request $request)
     {
+        // CEK SESSION
+        if (
+            !session('password_reset_email') ||
+            !session('otp_verified')
+        ) {
+
+            return response()->json([
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
         $validated = $request->validate([
-            'email' => 'required|email',
             'password' => [
                 'required',
                 'min:8',
@@ -213,56 +326,103 @@ class AuthController extends Controller
                 'regex:/[0-9]/'
             ]
         ], [
-            'email.required' => 'Email is required',
-            'email.email' => 'Invalid email format',
 
-            'password.required' => 'Password is required',
-            'password.min' => 'Password must be at least 8 characters',
-            'password.regex' => 'Password must contain at least one uppercase letter and one number'
+            'password.required' =>
+                'Password is required',
+
+            'password.min' =>
+                'Password must be at least 8 characters',
+
+            'password.regex' =>
+                'Password must contain uppercase and number'
         ]);
 
-        $user = User::where('email', $validated['email'])->first();
+        $email = session('password_reset_email');
+
+        $user = User::where(
+            'email',
+            $email
+        )->first();
 
         if (!$user) {
+
             return response()->json([
                 'message' => 'User not found'
             ], 404);
         }
 
-        $otp = Otp::where('email', $validated['email'])
-            ->where('is_verified', true)
-            ->first();
+        // CEK PASSWORD LAMA
+        if (
+            Hash::check(
+                $validated['password'],
+                $user->password
+            )
+        ) {
 
-        if (!$otp) {
             return response()->json([
-                'message' => 'OTP is not verified'
-            ], 400);
-        }
-
-        if (Hash::check($validated['password'], $user->password)) {
-            return response()->json([
-                'message' => 'New password cannot be the same as the old password'
+                'message' =>
+                    'New password cannot be the same as old password'
             ], 400);
         }
 
         $user->update([
-            'password' => Hash::make($validated['password'])
+            'password' => Hash::make(
+                $validated['password']
+            )
         ]);
 
-        $otp->delete();
+        // HAPUS OTP
+        Otp::where(
+            'email',
+            $email
+        )->delete();
+
+        // HAPUS SESSION RESET
+        session()->forget([
+            'password_reset_email',
+            'otp_verified'
+        ]);
 
         return response()->json([
-            'message' => 'Password has been successfully updated'
+            'message' =>
+                'Password has been successfully updated'
         ]);
     }
-
-    // Update Profile (Hanya Username & Phone)
     public function updateProfile(Request $request)
     {
         $user = $request->user();
+
         $validated = $request->validate([
-            'username' => 'required|string|max:20|unique:users,username,' . $user->id,
-            'phone' => 'required|numeric'
+
+            'username' => [
+                'required',
+                'string',
+                'max:20',
+                'unique:users,username,' . $user->id
+            ],
+
+            'phone' => [
+                'required',
+                'numeric'
+            ]
+
+        ], [
+
+            'username.required' =>
+                'Username is required',
+
+            'username.max' =>
+                'Username must not exceed 20 characters',
+
+            'username.unique' =>
+                'Username is already in use',
+
+            'phone.required' =>
+                'Phone number is required',
+
+            'phone.numeric' =>
+                'Phone number must contain numbers only'
+
         ]);
 
         $user->update($validated);
@@ -274,12 +434,9 @@ class AuthController extends Controller
         ]);
     }
 
-    // Change Password (Logout setelah sukses)
-    // Change Password (Logout setelah sukses)
     public function changePassword(Request $request)
     {
         $user = $request->user();
-
         $request->validate([
             'current_password' => 'required',
             'new_password' => [
@@ -293,35 +450,114 @@ class AuthController extends Controller
             'new_password.regex' => 'Password must contain at least one uppercase letter and one number'
         ]);
 
-        // cek password lama
         if (!Hash::check($request->current_password, $user->password)) {
-
             return response()->json([
                 'message' => 'Current password incorrect'
             ], 400);
         }
 
-        // password baru tidak boleh sama
         if (Hash::check($request->new_password, $user->password)) {
-
             return response()->json([
                 'message' => 'New password cannot be the same as the old one'
             ], 400);
         }
-
         $user->update([
             'password' => Hash::make($request->new_password)
         ]);
 
         // logout session
         Auth::guard('web')->logout();
-
         $request->session()->invalidate();
-
         $request->session()->regenerateToken();
-
         return response()->json([
             'message' => 'Password updated. Please login again.'
+        ]);
+    }
+
+    // REDIRECT GOOGLE
+    public function redirectToGoogle()
+    {
+        return Socialite::driver('google')->redirect();
+    }
+
+    // GOOGLE CALLBACK
+    public function handleGoogleCallback(Request $request)
+    {
+        try {
+            $googleUser =
+                Socialite::driver('google')->user();
+
+            $user = User::where(
+                'email',
+                $googleUser->getEmail()
+            )->first();
+
+            if (!$user) {
+
+                $baseUsername = explode(
+                    '@',
+                    $googleUser->getEmail()
+                )[0];
+
+                $username = $baseUsername;
+
+                $counter = 1;
+
+                while (
+                    User::where(
+                        'username',
+                        $username
+                    )->exists()
+                ) {
+
+                    $username =
+                        $baseUsername . $counter;
+
+                    $counter++;
+                }
+
+                $user = User::create([
+                    'username' => $username,
+                    'email' => $googleUser->getEmail(),
+                    'password' => bcrypt(uniqid()),
+                    'phone' => '-',
+                    'provider' => 'google',
+                    'provider_id' => $googleUser->getId(),
+                    'is_google_user' => true,
+                ]);
+            } else {
+                $user->update([
+                    'provider' => 'google',
+                    'provider_id' => $googleUser->getId(),
+                ]);
+            }
+
+            // LOGIN USER
+            Auth::login($user, true);
+            $request->session()->regenerate();
+            return redirect(
+                'http://localhost:3000/dashboard'
+            );
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Google login failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    public function checkResetSession()
+    {
+        return response()->json([
+            'valid' => session()->has('password_reset_email')
+        ]);
+    }
+    public function checkOtpSession()
+    {
+        return response()->json([
+            'valid' =>
+                session()->has('password_reset_email') &&
+                session('otp_verified')
         ]);
     }
 }

@@ -12,6 +12,10 @@ Route::get('/test', function () {
 // PUBLIC
 Route::post('/register', [AuthController::class, 'register']);
 
+Route::get('/reset-session', [AuthController::class, 'checkResetSession']);
+
+Route::get('/otp-session', [AuthController::class, 'checkOtpSession']);
+
 // PROTECTED
 Route::middleware('auth:sanctum')->group(function () {
 

@@ -10,6 +10,14 @@ class Otp extends Model
         'email',
         'otp',
         'expired_at',
-        'is_verified'
+        'is_verified',
+        'attempts',
+        'locked_until'
+    ];
+
+    protected $casts = [
+        'expired_at' => 'datetime',
+        'locked_until' => 'datetime',
+        'is_verified' => 'boolean',
     ];
 }

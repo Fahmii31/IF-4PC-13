@@ -13,6 +13,11 @@ Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
 
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
+// GOOGLE LOGIN
+Route::get('/auth/google', [AuthController::class, 'redirectToGoogle']);
+
+Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
+
 Route::middleware('auth:sanctum')->get('/me', function () {
     return auth()->user();
 });
