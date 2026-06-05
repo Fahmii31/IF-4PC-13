@@ -116,9 +116,7 @@ export default function RegisterPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* USERNAME */}
             <div className="relative">
-              <label className="text-sm text-gray-600 mb-1 block">
-                Username
-              </label>
+              <label className="text-sm text-gray-600 mb-1 block">Username</label>
               <div className="relative">
                 <input
                   type="text"
@@ -136,9 +134,7 @@ export default function RegisterPage() {
                 />
               </div>
               {errors.username && (
-                <p className="text-red-500 text-[11px] mt-1 font-medium">
-                  {errors.username}
-                </p>
+                <p className="text-red-500 text-[11px] mt-1 font-medium">{errors.username}</p>
               )}
             </div>
 
@@ -162,17 +158,13 @@ export default function RegisterPage() {
                 />
               </div>
               {errors.email && (
-                <p className="text-red-500 text-[11px] mt-1 font-medium">
-                  {errors.email}
-                </p>
+                <p className="text-red-500 text-[11px] mt-1 font-medium">{errors.email}</p>
               )}
             </div>
 
             {/* PASSWORD */}
             <div>
-              <label className="text-sm text-gray-600 mb-1 block">
-                Password
-              </label>
+              <label className="text-sm text-gray-600 mb-1 block">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -193,17 +185,13 @@ export default function RegisterPage() {
                 </button>
               </div>
               {errors.password && (
-                <p className="text-red-500 text-[11px] mt-1 font-medium">
-                  {errors.password}
-                </p>
+                <p className="text-red-500 text-[11px] mt-1 font-medium">{errors.password}</p>
               )}
             </div>
 
             {/* CONFIRM PASSWORD */}
             <div>
-              <label className="text-sm text-gray-600 mb-1 block">
-                Confirm Password
-              </label>
+              <label className="text-sm text-gray-600 mb-1 block">Confirm Password</label>
               <div className="relative">
                 <input
                   type={showConfirmPassword ? "text" : "password"}
@@ -220,11 +208,7 @@ export default function RegisterPage() {
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition"
                 >
-                  {showConfirmPassword ? (
-                    <EyeOff size={18} />
-                  ) : (
-                    <Eye size={18} />
-                  )}
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
               {errors.confirmPassword && (
@@ -237,9 +221,7 @@ export default function RegisterPage() {
 
           {/* WHATSAPP */}
           <div>
-            <label className="text-sm text-gray-600 mb-1 block">
-              WhatsApp Number
-            </label>
+            <label className="text-sm text-gray-600 mb-1 block">WhatsApp Number</label>
             <div className="relative">
               <input
                 type="text"
@@ -258,9 +240,7 @@ export default function RegisterPage() {
               />
             </div>
             {errors.phone && (
-              <p className="text-red-500 text-[11px] mt-1 font-medium">
-                {errors.phone}
-              </p>
+              <p className="text-red-500 text-[11px] mt-1 font-medium">{errors.phone}</p>
             )}
           </div>
 
@@ -301,10 +281,7 @@ export default function RegisterPage() {
 
         <p className="text-center mt-6 sm:mt-8 text-gray-500 text-sm">
           Already have an account?{" "}
-          <Link
-            href="/login"
-            className="text-blue-600 font-semibold hover:underline"
-          >
+          <Link href="/login" className="text-blue-600 font-semibold hover:underline">
             Sign In
           </Link>
         </p>

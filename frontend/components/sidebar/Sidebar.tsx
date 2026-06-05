@@ -29,13 +29,7 @@ type SidebarProps = {
   onLogout: () => void;
 };
 
-export default function Sidebar({
-  user,
-  isOpen,
-  onClose,
-  onLogout,
-}: SidebarProps) {
-
+export default function Sidebar({ user, isOpen, onClose, onLogout }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -52,9 +46,7 @@ export default function Sidebar({
   const isSettings = pathname === "/settings";
 
   const isHistory =
-    pathname === "/history" ||
-    pathname === "/history/monthly" ||
-    pathname === "/history/yearly";
+    pathname === "/history" || pathname === "/history/monthly" || pathname === "/history/yearly";
 
   return (
     <aside
@@ -67,24 +59,18 @@ export default function Sidebar({
     >
       {/* 1. BAGIAN ATAS & MENU UTAMA (SCROLLABLE jika menu banyak) */}
       <div className="flex-1 overflow-y-auto">
-
         <div className="flex items-center justify-between p-6 mb-4">
           <div className="flex items-center gap-3">
             <LogoBlue />
             <div>
-              <h1 className="text-blue-600 font-bold text-xl leading-none">
-                VoltCore
-              </h1>
+              <h1 className="text-blue-600 font-bold text-xl leading-none">VoltCore</h1>
               <p className="text-[10px] tracking-widest text-gray-500 mt-1 uppercase">
                 Power Intelligence
               </p>
             </div>
           </div>
 
-          <button
-            className="md:hidden text-gray-400"
-            onClick={onClose}
-          >
+          <button className="md:hidden text-gray-400" onClick={onClose}>
             <X size={24} />
           </button>
         </div>
@@ -98,9 +84,11 @@ export default function Sidebar({
             }}
             className={`
               flex items-center gap-3 w-full px-4 py-3 rounded-xl transition text-left
-              ${isDashboard
-                ? "bg-blue-50 text-blue-600 font-semibold"
-                : "text-gray-500 hover:bg-gray-50 font-medium"}
+              ${
+                isDashboard
+                  ? "bg-blue-50 text-blue-600 font-semibold"
+                  : "text-gray-500 hover:bg-gray-50 font-medium"
+              }
             `}
           >
             <LayoutDashboard size={20} />
@@ -113,9 +101,11 @@ export default function Sidebar({
               onClick={() => setIsHistoryOpen(!isHistoryOpen)}
               className={`
                 flex items-center justify-between w-full px-4 py-3 rounded-xl transition text-left
-                ${isHistory
-                  ? "bg-blue-50 text-blue-600 font-semibold"
-                  : "text-gray-500 hover:bg-gray-50 font-medium"}
+                ${
+                  isHistory
+                    ? "bg-blue-50 text-blue-600 font-semibold"
+                    : "text-gray-500 hover:bg-gray-50 font-medium"
+                }
               `}
             >
               <div className="flex items-center gap-3">
@@ -127,6 +117,7 @@ export default function Sidebar({
 
             {isHistoryOpen && (
               <div className="ml-9 space-y-1 pr-2">
+                {/* Opsi 1: Consumption */}
                 <button
                   onClick={() => {
                     router.push("/history");
@@ -134,42 +125,32 @@ export default function Sidebar({
                   }}
                   className={`
                     w-full px-4 py-2 rounded-lg text-sm text-left transition
-                    ${pathname === "/history"
-                      ? "bg-blue-100/50 text-blue-600 font-bold"
-                      : "text-gray-400 hover:text-blue-600 hover:bg-gray-50 font-medium"}
+                    ${
+                      pathname === "/history"
+                        ? "bg-blue-100/50 text-blue-600 font-bold"
+                        : "text-gray-400 hover:text-blue-600 hover:bg-gray-50 font-medium"
+                    }
                   `}
                 >
                   Consumption
                 </button>
 
+                {/* PERBAIKAN Opsi 2: Menggabungkan Monthly & Yearly menjadi Energy Analytics */}
                 <button
                   onClick={() => {
-                    router.push("/history/monthly");
+                    router.push("/history/analytics");
                     onClose();
                   }}
                   className={`
                     w-full px-4 py-2 rounded-lg text-sm text-left transition
-                    ${pathname === "/history/monthly"
-                      ? "bg-blue-100/50 text-blue-600 font-bold"
-                      : "text-gray-400 hover:text-blue-600 hover:bg-gray-50 font-medium"}
+                    ${
+                      pathname === "/history/analytics"
+                        ? "bg-blue-100/50 text-blue-600 font-bold"
+                        : "text-gray-400 hover:text-blue-600 hover:bg-gray-50 font-medium"
+                    }
                   `}
                 >
-                  Monthly Report
-                </button>
-
-                <button
-                  onClick={() => {
-                    router.push("/history/yearly");
-                    onClose();
-                  }}
-                  className={`
-                    w-full px-4 py-2 rounded-lg text-sm text-left transition
-                    ${pathname === "/history/yearly"
-                      ? "bg-blue-100/50 text-blue-600 font-bold"
-                      : "text-gray-400 hover:text-blue-600 hover:bg-gray-50 font-medium"}
-                  `}
-                >
-                  Yearly Report
+                  Analytics
                 </button>
               </div>
             )}
@@ -183,9 +164,11 @@ export default function Sidebar({
             }}
             className={`
               flex items-center gap-3 w-full px-4 py-3 rounded-xl transition text-left
-              ${isSettings
-                ? "bg-blue-50 text-blue-600 font-semibold"
-                : "text-gray-500 hover:bg-gray-50 font-medium"}
+              ${
+                isSettings
+                  ? "bg-blue-50 text-blue-600 font-semibold"
+                  : "text-gray-500 hover:bg-gray-50 font-medium"
+              }
             `}
           >
             <Settings size={20} />
@@ -196,7 +179,6 @@ export default function Sidebar({
 
       {/* 2. BAGIAN FOOTER (USER DI ATAS LOGOUT, FIX DI BAWAH) */}
       <div className="p-4 border-t border-gray-100 space-y-3 bg-white">
-        
         {/* INFO USER */}
         {user && (
           <div
@@ -220,14 +202,22 @@ export default function Sidebar({
               <p className="font-bold text-sm text-gray-900 truncate tracking-tight">
                 {user?.username || "Loading..."}
               </p>
-              <p className="text-[10px] text-gray-500 truncate font-medium">
-                {user?.email || ""}
-              </p>
+              <p className="text-[10px] text-gray-500 truncate font-medium">{user?.email || ""}</p>
             </div>
 
             {/* Arrow Icon */}
             <div className="text-gray-300 group-hover:text-blue-600 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="m9 18 6-6-6-6" />
               </svg>
             </div>
@@ -242,7 +232,6 @@ export default function Sidebar({
           <LogOut size={18} />
           LOGOUT
         </button>
-        
       </div>
     </aside>
   );

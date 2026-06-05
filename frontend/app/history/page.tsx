@@ -1,12 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-import {
-  Calendar,
-  FileSpreadsheet,
-  ChevronDown,
-} from "lucide-react";
+import { Calendar, FileSpreadsheet, ChevronDown } from "lucide-react";
 
 import { useRouter } from "next/navigation";
 
@@ -26,12 +22,20 @@ interface UsageRecord {
   cost: string;
 }
 
-export default function HistoryPage() {
+interface BackendHistoryItem {
+  tanggal: string;
+  total_kwh: string | number;
+  arus_ampere: string | number;
+  tegangan_volt: string | number;
+  daya_watt: string | number;
+  total_biaya: string | number;
+}
 
+export default function HistoryPage() {
   const router = useRouter();
 
   // AUTH
-  const {user} = useAuth();
+  const { user } = useAuth();
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
@@ -39,59 +43,70 @@ export default function HistoryPage() {
 
   const [visibleRecords, setVisibleRecords] = useState(8);
 
-// LOGOUT
-const handleLogout = async () => {
+  // STATE DATA & ERROR
+  const [consumptionData, setConsumptionData] = useState<UsageRecord[]>([]);
+  const [apiError, setApiError] = useState<string | null>(null);
 
-  await logoutUser();
+  // LOGOUT
+  const handleLogout = async () => {
+    await logoutUser();
 
-  router.replace("/login");
-};
+    router.replace("/login");
+  };
 
-  const consumptionData: UsageRecord[] = [
-    {
-      date: "April 19, 2026",
-      energy: "12.4",
-      current: "4.2",
-      voltage: "220.1",
-      power: "924",
-      cost: "1.840",
-    },
-    {
-      date: "April 18, 2026",
-      energy: "15.8",
-      current: "5.1",
-      voltage: "219.5",
-      power: "1120",
-      cost: "2.350",
-    },
-    {
-      date: "April 17, 2026",
-      energy: "11.2",
-      current: "3.8",
-      voltage: "220.4",
-      power: "836",
-      cost: "1.660",
-    },
-    {
-      date: "April 16, 2026",
-      energy: "14.5",
-      current: "4.8",
-      voltage: "221.2",
-      power: "1060",
-      cost: "2.100",
-    },
-    {
-      date: "March 25, 2026",
-      energy: "13.2",
-      current: "4.4",
-      voltage: "220.0",
-      power: "968",
-      cost: "1.950",
-    },
-  ];
+  // AMBIL DATA BERDASARKAN MEKANISME COOKIE SANCTUM
+  useEffect(() => {
+    const fetchHistoryData = async () => {
+      try {
+        setApiError(null);
+
+        // DISESUAIKAN: Menggunakan credentials include & Accept json seperti lib/auth.ts
+        const res = await fetch("http://localhost:8000/api/history/daily", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!res.ok) {
+          setApiError(`Backend bermasalah! Status Code: ${res.status}.`);
+          return;
+        }
+
+        const data: BackendHistoryItem[] = await res.json();
+
+        // MAPPING DATA
+        const mappedData: UsageRecord[] = data.map((item: BackendHistoryItem) => {
+          const formattedDate = item.tanggal
+            ? new Date(item.tanggal).toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })
+            : "N/A";
+
+          return {
+            date: formattedDate,
+            energy: String(item.total_kwh ?? "0"),
+            current: String(item.arus_ampere ?? "0"),
+            voltage: String(item.tegangan_volt ?? "0"),
+            power: String(item.daya_watt ?? "0"),
+            cost: item.total_biaya ? Number(item.total_biaya).toLocaleString("id-ID") : "0",
+          };
+        });
+
+        setConsumptionData(mappedData);
+      } catch (error) {
+        setApiError("Gagal terhubung ke server backend (Pastikan server Laravel berjalan).");
+      }
+    };
+
+    fetchHistoryData();
+  }, []);
 
   const handleLoadMore = () => {
-
     setVisibleRecords((prev) => prev + 5);
   };
 
@@ -104,12 +119,16 @@ const handleLogout = async () => {
         onNotificationClick={() => setIsNotificationOpen(true)}
       >
         <div className="p-4 md:p-8 flex-1 space-y-8">
+          {apiError && (
+            <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-bold shadow-sm">
+              ⚠️ {apiError}
+            </div>
+          )}
+
           <div className="bg-white rounded-2xl shadow-sm border border-gray-50 overflow-hidden">
             <div className="p-4 md:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-lg md:text-xl font-bold text-gray-800">
-                  Consumption Records
-                </h3>
+                <h3 className="text-lg md:text-xl font-bold text-gray-800">Consumption Records</h3>
                 <p className="text-[10px] md:text-xs text-gray-400 font-medium mt-1">
                   Daily energy usage history since January 2026
                 </p>
@@ -137,9 +156,17 @@ const handleLogout = async () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {consumptionData
-                    .slice(0, visibleRecords)
-                    .map((record, i) => (
+                  {consumptionData.length === 0 && !apiError ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="py-10 text-center text-xs text-gray-400 font-medium"
+                      >
+                        No historical data found.
+                      </td>
+                    </tr>
+                  ) : (
+                    consumptionData.slice(0, visibleRecords).map((record, i) => (
                       <tr key={i} className="hover:bg-slate-50/50 transition">
                         <td className="py-6 flex items-center gap-4">
                           <div className="p-2.5 bg-slate-50 text-blue-600 rounded-lg border border-gray-100 shrink-0">
@@ -165,7 +192,8 @@ const handleLogout = async () => {
                           Rp {record.cost}
                         </td>
                       </tr>
-                    ))}
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -185,12 +213,8 @@ const handleLogout = async () => {
         </div>
       </MainLayout>
 
-      <Notifications
-        isOpen={isNotificationOpen}
-        onClose={() => setIsNotificationOpen(false)}
-      />
+      <Notifications isOpen={isNotificationOpen} onClose={() => setIsNotificationOpen(false)} />
 
-      {/* Gunakan Komponen Baru disini */}
       <ExportExcel
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
@@ -208,7 +232,7 @@ const handleLogout = async () => {
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #E2E8F0;
+          background: #e2e8f0;
           border-radius: 10px;
         }
       `}</style>

@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\OtpMail;
 use Laravel\Socialite\Facades\Socialite;
+use App\Models\Device;
+use App\Models\Setting;
 
 class AuthController extends Controller
 {
@@ -51,6 +53,7 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
             'phone' => $validated['phone'],
         ]);
+        $this->createDefaultDeviceAndSetting($user);
 
         return response()->json([
             'message' => 'Register success',
@@ -525,13 +528,14 @@ class AuthController extends Controller
                     'provider_id' => $googleUser->getId(),
                     'is_google_user' => true,
                 ]);
+                $this->createDefaultDeviceAndSetting($user);
             } else {
                 $user->update([
                     'provider' => 'google',
                     'provider_id' => $googleUser->getId(),
                 ]);
             }
-
+            
             // LOGIN USER
             Auth::login($user, true);
             $request->session()->regenerate();
@@ -560,4 +564,25 @@ class AuthController extends Controller
                 session('otp_verified')
         ]);
     }
+
+    private function createDefaultDeviceAndSetting(User $user)
+{
+    // Buat device
+    $device = Device::create([
+        'user_id' => $user->id,
+        'kode_device' => 'DEV-' . strtoupper(substr(uniqid(), -6)),
+        'nama_perangkat' => 'VoltCore Device',
+        'last_seen' => now(),
+    ]);
+
+    // Buat setting - PAKE $device->device_id (Sesuai Primary Key)
+    Setting::create([
+        'user_id'         => $user->id,    
+        'device_id'       => $device->device_id, 
+        'tarif_id'        => null,
+        'batas_daya_watt' => null,
+        'batas_biaya'     => null,
+        'configured_at'   => null,
+    ]);
+}
 }
