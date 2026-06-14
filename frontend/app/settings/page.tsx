@@ -214,6 +214,10 @@ export default function SettingsPage() {
     };
   };
 
+  const powerAlertConfigured = selectedTariffId !== null && wattLimit > 0;
+
+  const costAlertConfigured = selectedTariffId !== null && costLimit > 0;
+
   // LOGOUT
   const handleLogout = async () => {
     await logoutUser();
@@ -326,6 +330,18 @@ export default function SettingsPage() {
                     <h4 className="font-bold text-gray-800">Power Limit</h4>
                     <p className="text-xs text-gray-400">Set your maximum power threshold(W)</p>
                   </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <div
+                      className={`w-2 h-2 rounded-full ${
+                        powerAlertConfigured ? "bg-emerald-500" : "bg-amber-500"
+                      }`}
+                    />
+                    <span className="text-xs font-medium text-gray-500">
+                      {powerAlertConfigured
+                        ? "Power Alert Monitoring Active"
+                        : "Power Alert Monitoring Disabled"}
+                    </span>
+                  </div>
                   <div
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 shadow-sm transition-all ${isEditing ? "bg-white border-blue-500" : "bg-gray-50 border-gray-100"}`}
                   >
@@ -351,11 +367,11 @@ export default function SettingsPage() {
                   <input
                     type="range"
                     min="0"
-                    max="99999"
+                    max="9999"
                     disabled={!isEditing}
                     value={wattLimit}
                     onChange={(e) => setWattLimit(Number(e.target.value))}
-                    style={getBackgroundSize(wattLimit, 99999)}
+                    style={getBackgroundSize(wattLimit, 9999)}
                     className={`styled-slider watt-slider ${!isEditing ? "cursor-not-allowed opacity-50" : ""}`}
                   />
                 )}
@@ -367,6 +383,18 @@ export default function SettingsPage() {
                   <div>
                     <h4 className="font-bold text-gray-800">Monthly Cost Limit</h4>
                     <p className="text-xs text-gray-400">Set your monthly budget limit</p>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <div
+                      className={`w-2 h-2 rounded-full ${
+                        costAlertConfigured ? "bg-emerald-500" : "bg-amber-500"
+                      }`}
+                    />
+                    <span className="text-xs font-medium text-gray-500">
+                      {costAlertConfigured
+                        ? "Cost Alert Monitoring Active"
+                        : "Cost Alert Monitoring Disabled"}
+                    </span>
                   </div>
                   <div
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 shadow-sm transition-all ${isEditing ? "bg-white border-emerald-500" : "bg-gray-50 border-gray-100"}`}
@@ -393,12 +421,12 @@ export default function SettingsPage() {
                   <input
                     type="range"
                     min="0"
-                    max="9999999"
+                    max="999999"
                     step="10000"
                     disabled={!isEditing}
                     value={costLimit}
                     onChange={(e) => setCostLimit(Number(e.target.value))}
-                    style={getBackgroundSize(costLimit, 9999999)}
+                    style={getBackgroundSize(costLimit, 999999)}
                     className={`styled-slider cost-slider ${!isEditing ? "cursor-not-allowed opacity-50" : ""}`}
                   />
                 )}

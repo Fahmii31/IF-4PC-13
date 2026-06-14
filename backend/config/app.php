@@ -123,4 +123,15 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Frontend URL Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Di sini kita mendaftarkan url Next.js agar bisa dibaca dengan aman
+    | oleh Controller menggunakan fungsi config('app.frontend_url')
+    |
+    */
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+
 ];

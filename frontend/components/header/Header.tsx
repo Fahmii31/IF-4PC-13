@@ -4,80 +4,47 @@ import { useEffect, useState } from "react";
 import { Bell, User, Menu } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import { useNotification } from "@/components/context/NotificationContext";
+
 type HeaderProps = {
   title: string;
   onMenuClick: () => void;
   onNotificationClick: () => void;
 };
 
-const API_URL = "http://localhost:8000/api";
-
 export default function Header({ title, onMenuClick, onNotificationClick }: HeaderProps) {
   const router = useRouter();
+
+  const { alerts } = useNotification();
+
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState(new Date());
-  const [notifCount, setNotifCount] = useState(0);
 
   useEffect(() => {
-    requestAnimationFrame(() => {
+    const hydrationTimeout = setTimeout(() => {
       setMounted(true);
-    });
+    }, 0);
 
-    async function getInitialNotifCount() {
-      try {
-        const res = await fetch(`${API_URL}/notifications`, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-          credentials: "include",
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setNotifCount(data.length);
-        }
-      } catch (error) {
-        console.error("Failed to fetch notification count:", error);
-      }
-    }
+    return () => clearTimeout(hydrationTimeout);
+  }, []);
 
-    getInitialNotifCount();
-
+  useEffect(() => {
     const timer = setInterval(() => {
       setTime(new Date());
     }, 1000);
 
-    const notifInterval = setInterval(() => {
-      getInitialNotifCount();
-    }, 300000);
-
-    return () => {
-      clearInterval(timer);
-      clearInterval(notifInterval);
-    };
+    return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    async function refreshNotifCount() {
-      try {
-        const res = await fetch(`${API_URL}/notifications`, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setNotifCount(data.length);
-        }
-      } catch (error) {
-        console.error("Failed to refresh notification count:", error);
-      }
-    }
-
-    refreshNotifCount();
-  }, [onNotificationClick]);
+  const handleBellClick = () => {
+    onNotificationClick();
+  };
 
   const formatDateTime = (date: Date) => {
     if (!mounted) return "TIME: LOADING...";
 
     const day = date.getDate();
+
     const months = [
       "JAN",
       "FEB",
@@ -95,7 +62,9 @@ export default function Header({ title, onMenuClick, onNotificationClick }: Head
 
     const month = months[date.getMonth()];
     const year = date.getFullYear();
+
     const hours = date.getHours().toString().padStart(2, "0");
+
     const minutes = date.getMinutes().toString().padStart(2, "0");
 
     return `TIME: ${day} ${month} ${year} | ${hours}:${minutes} WIB`;
@@ -122,13 +91,19 @@ export default function Header({ title, onMenuClick, onNotificationClick }: Head
 
       <div className="flex-1 flex justify-end items-center gap-3 md:gap-6">
         <button
-          onClick={onNotificationClick}
+          onClick={handleBellClick}
           className="text-gray-400 hover:text-blue-600 transition relative p-1"
         >
           <Bell className="w-5 h-5 md:w-6 md:h-6" />
 
-          {notifCount > 0 && (
-            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+          {alerts.length > 0 && (
+            <>
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">
+                {alerts.length}
+              </span>
+            </>
           )}
         </button>
 

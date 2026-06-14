@@ -219,8 +219,8 @@ export default function HistoryPage() {
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
         consumptionData={consumptionData}
-        defaultStartDate="2026-01-01"
-        defaultEndDate="2026-04-19"
+        defaultStartDate=""
+        defaultEndDate=""
       />
 
       <style jsx global>{`

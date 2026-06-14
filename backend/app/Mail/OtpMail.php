@@ -24,15 +24,15 @@ class OtpMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-
+            // Menggunakan config() bukan env()
             from: new Address(
-                env('MAIL_FROM_ADDRESS'),
+                config('mail.from.address') ?? 'voltcorepbl@gmail.com', 
                 'VoltCore'
             ),
 
             replyTo: [
                 new Address(
-                    env('MAIL_FROM_ADDRESS'),
+                    config('mail.from.address') ?? 'voltcorepbl@gmail.com', 
                     'VoltCore Support'
                 )
             ],

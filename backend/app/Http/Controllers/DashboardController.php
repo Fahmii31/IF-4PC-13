@@ -9,6 +9,8 @@ use App\Models\Setting;
 use App\Models\History;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Services\CostMonitorService;
+use App\Services\PowerMonitorService;
 
 class DashboardController extends Controller
 {
@@ -39,6 +41,7 @@ class DashboardController extends Controller
         if (!$isConfigured) {
             return response()->json([
                 'device' => [
+                    'device_id'      => $device->device_id,
                     'nama_perangkat' => $device->nama_perangkat,
                     'kode_device'    => $device->kode_device,
                     'status_relay'   => false,
@@ -81,6 +84,24 @@ class DashboardController extends Controller
             ]);
         }
 
+// POWER ALERT
+$powerMonitor = app(
+    PowerMonitorService::class
+);
+
+$powerMonitor->checkAndCreatePowerAlert(
+    $device->device_id
+);
+
+// COST ALERT
+$costMonitor = app(
+    CostMonitorService::class
+);
+
+$costMonitor->checkAndCreateCostAlert(
+    $device->device_id
+);
+
         // 5. Ambil metrik HARI INI
         $latestReadingToday = Reading::where('device_id', $device->device_id)
             ->whereDate('created_at', Carbon::today())
@@ -93,6 +114,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'device' => [
+                'device_id'      => $device->device_id,
                 'nama_perangkat' => $device->nama_perangkat,
                 'kode_device'    => $device->kode_device,
                 'status_relay'   => (bool) $device->status_relay,

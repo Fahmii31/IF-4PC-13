@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { AlertTriangle, Zap, Gauge, Wallet, Loader2, ArrowRight } from "lucide-react";
+import { Zap, Gauge, Wallet, Loader2, ArrowRight, AlertTriangle } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -12,12 +12,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useRouter } from "next/navigation";
+import Cookies from "js-cookie";
 
 import Notifications from "@/components/Notifications";
 import MainLayout from "@/components/layout/MainLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { logoutUser } from "@/lib/logout";
-import Cookies from "js-cookie";
 
 const API_URL = "http://localhost:8000/api";
 
@@ -25,14 +25,12 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
 
-  const [showAlert, setShowAlert] = useState(true);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
-  // State untuk Optimistic UI agar relay tidak delay
   const [isToggling, setIsToggling] = useState(false);
 
   const [deviceInfo, setDeviceInfo] = useState({
+    device_id: 0,
     nama_perangkat: "VoltCore Device",
     kode_device: "-",
     status_relay: false,
@@ -57,30 +55,33 @@ export default function DashboardPage() {
   });
 
   const [dataTrend, setDataTrend] = useState([]);
-  const relayStatusRef = useRef(false);
+  const [chartMode, setChartMode] = useState<"watt" | "kwh">("kwh");
+  const prevExceededRef = useRef(false);
+  const [dismissedPowerAlert, setDismissedPowerAlert] = useState(false);
+
+  const isPowerExceeded =
+    userLimits.isConfigured && Number(metrics.daya_watt) > Number(userLimits.batas_daya_watt);
+
+  const showPowerPopup = isPowerExceeded && !dismissedPowerAlert;
 
   const syncDashboard = useCallback(async () => {
     try {
-      const [resOverview, resSettings] = await Promise.all([
-        fetch(`${API_URL}/dashboard/overview`, { credentials: "include", cache: "no-store" }),
-        fetch(`${API_URL}/settings`, { credentials: "include" }),
-      ]);
+      const resOverview = await fetch(`${API_URL}/dashboard/overview`, {
+        credentials: "include",
+        cache: "no-store",
+      });
 
       if (resOverview.status === 401) {
         router.replace("/login");
         return;
       }
 
-      if (resOverview.ok && resSettings.ok) {
+      if (resOverview.ok) {
         const jsonOverview = await resOverview.json();
-        const jsonSettings = await resSettings.json();
 
-        // Hanya update state jika sedang tidak dalam proses toggle (mencegah flickering)
         if (!isToggling) {
           setDeviceInfo(jsonOverview.device);
         }
-
-        relayStatusRef.current = !!jsonOverview.device.status_relay;
 
         setMetrics(
           jsonOverview.device.status_relay
@@ -90,42 +91,69 @@ export default function DashboardPage() {
                 daya_watt: 0,
                 tegangan_volt: 0,
                 energi_kwh: jsonOverview.metrics.energi_kwh,
-                estimasi_biaya: 0,
+                estimasi_biaya: jsonOverview.metrics.estimasi_biaya,
               }
         );
 
         setDataTrend(jsonOverview.chart_trend || []);
-        setUserLimits({
-          tarif_id: jsonSettings.tarif_id || null,
-          daya_va: jsonSettings.daya_va || 0,
-          batas_daya_watt: jsonSettings.batas_daya_watt || 0,
-          batas_biaya: Number(jsonSettings.batas_biaya || 0),
-          isConfigured: !!jsonSettings.configured_at, // Pastikan logika ini selaras dengan kebutuhan Anda
-        });
       }
     } catch (err) {
       console.error("Sync gagal:", err);
     }
   }, [router, isToggling]);
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/settings`, {
+        credentials: "include",
+      });
+
+      if (!res.ok) return;
+
+      const jsonSettings = await res.json();
+
+      setUserLimits({
+        tarif_id: jsonSettings.tarif_id || null,
+        daya_va: jsonSettings.daya_va || 0,
+        batas_daya_watt: jsonSettings.batas_daya_watt || 0,
+        batas_biaya: Number(jsonSettings.batas_biaya || 0),
+        isConfigured: !!jsonSettings.configured_at,
+      });
+    } catch (err) {
+      console.error("Failed to fetch settings:", err);
+    }
+  }, []);
+
   useEffect(() => {
     const init = async () => {
-      await syncDashboard();
+      await Promise.all([fetchSettings(), syncDashboard()]);
+
       setIsLoading(false);
     };
+
     init();
 
     const interval = setInterval(syncDashboard, 10000);
+
     return () => clearInterval(interval);
-  }, [syncDashboard]);
+  }, [syncDashboard, fetchSettings]);
+
+  useEffect(() => {
+    const isExceeded =
+      userLimits.isConfigured && Number(metrics.daya_watt) > Number(userLimits.batas_daya_watt);
+
+    if (!prevExceededRef.current && isExceeded) {
+      setDismissedPowerAlert(false);
+    }
+
+    prevExceededRef.current = isExceeded;
+  }, [metrics.daya_watt, userLimits.batas_daya_watt, userLimits.isConfigured]);
 
   const handleToggleRelay = async () => {
-    if (isToggling) return; // Cegah double-click
+    if (isToggling) return;
     setIsToggling(true);
 
     const target = !deviceInfo.status_relay;
-
-    // OPTIMISTIC UPDATE: Langsung rubah UI tanpa menunggu API
     setDeviceInfo((prev) => ({ ...prev, status_relay: target }));
 
     try {
@@ -140,12 +168,10 @@ export default function DashboardPage() {
       });
 
       if (!res.ok) throw new Error();
-      // Sinkronisasi background setelah berhasil
       syncDashboard();
     } catch {
-      // REVERT jika gagal ke API
       setDeviceInfo((prev) => ({ ...prev, status_relay: !target }));
-      alert("Gagal update status relay.");
+      alert("Failed to update relay status.");
     } finally {
       setIsToggling(false);
     }
@@ -156,6 +182,10 @@ export default function DashboardPage() {
     router.replace("/login");
   };
 
+  const handleDismissPowerAlert = () => {
+    setDismissedPowerAlert(true);
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -163,9 +193,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  const isPowerOverLimit =
-    userLimits.batas_daya_watt > 0 && metrics.daya_watt >= userLimits.batas_daya_watt;
 
   return (
     <>
@@ -175,6 +202,49 @@ export default function DashboardPage() {
         onLogout={handleLogout}
         onNotificationClick={() => setIsNotificationOpen(true)}
       >
+        {showPowerPopup && (
+          // w-full memastikan lebarnya otomatis pas dan sejajar dengan komponen dashboard lainnya
+          <div className="w-full mb-5 animate-in fade-in duration-200">
+            {/* Tetap mempertahankan tinggi yang ramping (p-3) agar estetik */}
+            <div className="flex items-center justify-between bg-red-50/70 border border-red-100 rounded-xl p-3 sm:px-5 sm:py-3 shadow-sm shadow-red-500/[0.02] gap-3">
+              {/* Sisi Kiri: Ikon + Teks tetap sejajar horizontal di mobile & desktop */}
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {/* Ukuran Ikon Padat */}
+                <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-red-500 to-red-600 text-white shadow-sm shadow-red-500/10 shrink-0">
+                  <AlertTriangle size={18} className="sm:hidden" />
+                  <AlertTriangle size={20} className="hidden sm:block" />
+                </div>
+
+                {/* Kontainer Teks Sleek & Compact */}
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-red-950 text-xs sm:text-sm tracking-tight leading-tight">
+                    Alert: Power Limit Exceeded
+                  </h3>
+
+                  <p className="text-red-700/80 text-[11px] sm:text-xs mt-0.5 leading-normal truncate sm:whitespace-normal">
+                    Current usage (
+                    <span className="font-mono font-bold text-red-600 bg-white/90 px-1 rounded text-[10px] sm:text-xs">
+                      {Number(metrics.daya_watt).toLocaleString("id-ID")}W
+                    </span>
+                    ) has reached the limit (
+                    <span className="font-mono font-semibold text-red-950/80">
+                      {Number(userLimits.batas_daya_watt).toLocaleString("id-ID")}W
+                    </span>
+                    )
+                  </p>
+                </div>
+              </div>
+
+              {/* Sisi Kanan: Tombol Dismiss Minimalis */}
+              <button
+                onClick={handleDismissPowerAlert}
+                className="font-bold text-[10px] sm:text-xs uppercase tracking-wider text-red-700 hover:text-red-900 hover:bg-red-100/60 px-2.5 py-1.5 rounded-lg transition-all duration-200 shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
         {!userLimits.isConfigured && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-amber-50 border border-amber-200 text-amber-800 px-4 md:px-6 py-4 rounded-xl mb-6 gap-4 shadow-sm animate-pulse">
             <div>
@@ -189,29 +259,6 @@ export default function DashboardPage() {
               className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 transition uppercase bg-white px-3 py-1.5 rounded-lg shadow-sm shrink-0 border border-amber-100"
             >
               Configure Now <ArrowRight size={14} />
-            </button>
-          </div>
-        )}
-
-        {showAlert && isPowerOverLimit && deviceInfo.is_online && (
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between bg-red-100/80 border border-red-200 text-red-700 px-4 md:px-6 py-4 rounded-xl mb-6 gap-4">
-            <div className="flex items-center gap-4">
-              <div className="bg-red-500 text-white p-1.5 rounded-lg shrink-0">
-                <AlertTriangle size={20} />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm md:text-base">Alert: Power Limit Exceeded</h4>
-                <p className="text-xs md:text-sm opacity-90">
-                  Current usage ({metrics.daya_watt} watts) has reached the limit (
-                  {userLimits.batas_daya_watt} W)
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowAlert(false)}
-              className="text-xs font-bold tracking-wider hover:opacity-70 transition uppercase self-end md:self-center"
-            >
-              Dismiss
             </button>
           </div>
         )}
@@ -264,7 +311,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
 
-                {/* Perbaikan UI Device Online/Offline Dinamis */}
                 <div
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl border self-end ${deviceInfo.is_online ? "bg-green-50 border-green-100" : "bg-gray-50 border-gray-200"}`}
                 >
@@ -287,7 +333,7 @@ export default function DashboardPage() {
                 disabled={!deviceInfo.is_online || isToggling}
                 onClick={() => {
                   if (!userLimits.isConfigured) {
-                    alert("Harap lakukan konfigurasi VA terlebih dahulu di halaman Settings!");
+                    alert("Please configure VA settings first in the Settings page!");
                     return;
                   }
                   handleToggleRelay();
@@ -316,7 +362,6 @@ export default function DashboardPage() {
                 </div>
               </button>
 
-              {/* Perbaikan Teks Menjadi 1 Baris dengan whitespace-nowrap */}
               <p
                 className={`mt-6 font-bold tracking-wider text-[9px] sm:text-[10px] md:text-xs whitespace-nowrap uppercase ${!userLimits.isConfigured ? "text-amber-600" : deviceInfo.status_relay ? "text-blue-600" : "text-gray-500"}`}
               >
@@ -368,11 +413,27 @@ export default function DashboardPage() {
           <div className="lg:col-span-2 bg-white p-4 md:p-8 rounded-3xl shadow-sm border border-gray-50 flex flex-col order-1 lg:order-2">
             <div className="flex justify-between items-start mb-6 md:mb-8">
               <div>
-                <h3 className="text-lg md:text-xl font-bold text-gray-900">Energy Usage Trend</h3>
+                <h3 className="text-lg md:text-xl font-bold text-gray-900">
+                  Electricity Consumption Trend
+                </h3>
                 <p className="text-xs text-gray-500 mt-1">Real-time monitoring</p>
               </div>
-              <div className="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-[10px] md:text-sm font-bold uppercase">
-                Today
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setChartMode("watt")}
+                  className={`px-3 py-1 rounded-full text-[10px] md:text-sm font-bold uppercase transition
+      ${chartMode === "watt" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500"}`}
+                >
+                  Watt
+                </button>
+
+                <button
+                  onClick={() => setChartMode("kwh")}
+                  className={`px-3 py-1 rounded-full text-[10px] md:text-sm font-bold uppercase transition
+      ${chartMode === "kwh" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500"}`}
+                >
+                  kWh
+                </button>
               </div>
             </div>
             <div className="flex-1 w-full min-h-[250px] md:min-h-[300px]">
@@ -393,15 +454,25 @@ export default function DashboardPage() {
                       axisLine={false}
                       tickLine={false}
                       tick={{ fill: "#9ca3af", fontSize: 10 }}
-                      tickFormatter={(value) => `${value} kWh`}
+                      tickFormatter={(value) =>
+                        chartMode === "watt" ? `${value} W` : `${value} kWh`
+                      }
                     />
                     <Tooltip
-                      contentStyle={{ borderRadius: "12px", border: "none", fontSize: "12px" }}
+                      contentStyle={{
+                        borderRadius: "12px",
+                        border: "none",
+                        fontSize: "12px",
+                      }}
                       labelFormatter={(value) => `Time: ${value} WIB`}
+                      formatter={(value) => [
+                        chartMode === "watt" ? `${value ?? 0} W` : `${value ?? 0} kWh`,
+                        chartMode === "watt" ? "Power" : "Energy",
+                      ]}
                     />
                     <Line
                       type="monotone"
-                      dataKey="kwh"
+                      dataKey={chartMode}
                       stroke="#2563eb"
                       strokeWidth={2}
                       dot={false}

@@ -1,89 +1,24 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { AlertTriangle, X, Loader2 } from "lucide-react";
-import Cookies from "js-cookie";
-
-interface NotificationItem {
-  notif_id: number;
-  jenis_notif: string;
-  pesan: string;
-  created_at: string;
-}
+import { useNotification } from "@/components/context/NotificationContext";
 
 interface NotificationsProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const API_URL = "http://localhost:8000/api";
-
 export default function Notifications({ isOpen, onClose }: NotificationsProps) {
-  const [alerts, setAlerts] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function fetchNotifications(showLoading = false) {
-      try {
-        if (showLoading && isMounted) setLoading(true);
-        const res = await fetch(`${API_URL}/notifications`, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-          credentials: "include",
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted) setAlerts(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch system alerts:", error);
-      } finally {
-        if (showLoading && isMounted) setLoading(false);
-      }
-    }
-
-    if (isOpen) {
-      fetchNotifications(true);
-
-      const interval = setInterval(() => {
-        fetchNotifications(false);
-      }, 300000);
-
-      return () => {
-        isMounted = false;
-        clearInterval(interval);
-      };
-    }
-  }, [isOpen]);
+  const { alerts, loading, clearAllAlerts } = useNotification();
 
   const handleClearAll = async () => {
     const confirmClear = window.confirm("Are you sure you want to dismiss all active alerts?");
     if (!confirmClear) return;
 
-    try {
-      setLoading(true);
-      const token = Cookies.get("XSRF-TOKEN");
-      const res = await fetch(`${API_URL}/notifications/clear-all`, {
-        method: "DELETE",
-        headers: {
-          Accept: "application/json",
-          "X-XSRF-TOKEN": decodeURIComponent(token || ""),
-        },
-        credentials: "include",
-      });
-
-      if (res.ok) {
-        setAlerts([]);
-      } else {
-        alert("Failed to clear system alerts.");
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
+    const success = await clearAllAlerts();
+    if (!success) {
+      alert("Failed to clear system alerts.");
     }
   };
 
@@ -111,7 +46,12 @@ export default function Notifications({ isOpen, onClose }: NotificationsProps) {
         </div>
 
         {/* ALERT LIST */}
-        <div className="px-6 py-4 space-y-3 min-h-[180px] max-h-[350px] overflow-y-auto flex flex-col justify-center">
+        {/* PERBAIKAN: justify-center hanya aktif jika alerts kosong agar scroll tidak rusak */}
+        <div
+          className={`px-6 py-4 space-y-3 min-h-[180px] max-h-[350px] overflow-y-auto flex flex-col ${
+            alerts.length === 0 ? "justify-center" : ""
+          }`}
+        >
           {loading && alerts.length === 0 ? (
             <div className="flex justify-center items-center py-10">
               <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
@@ -119,7 +59,7 @@ export default function Notifications({ isOpen, onClose }: NotificationsProps) {
           ) : alerts.length > 0 ? (
             alerts.map((alert) => (
               <div
-                key={alert.notif_id}
+                key={alert.notif_id} // PERBAIKAN: Diubah dari alert.id menjadi alert.notif_id
                 className="flex items-center justify-between p-5 bg-red-50/30 border border-red-100/40 rounded-[20px]"
               >
                 <div className="flex items-center gap-4">

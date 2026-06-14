@@ -14,6 +14,9 @@ class Setting extends Model
     'tarif_id',
     'batas_daya_watt',
     'batas_biaya',
+    'is_cost_alert_active',
+    'last_cost_alert_month',
+    'is_power_alert_active',
     'configured_at'
 ];
 

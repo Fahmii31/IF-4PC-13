@@ -35,56 +35,128 @@ class SettingController extends Controller
     }
 
     // UPDATE DEVICE SETTINGS
-    public function updateSetting(Request $request)
-    {
-        $validated = $request->validate([
-            'tarif_id'        => 'required|exists:tariffs,tarif_id',
-            'batas_daya_watt' => 'required|numeric|min:0',
-            'batas_biaya'     => 'required|numeric|min:0'
-        ]);
+   public function updateSetting(Request $request)
+{
+    $validated = $request->validate([
+        'tarif_id'        => 'required|exists:tariffs,tarif_id',
+        'batas_daya_watt' => 'required|numeric|min:0',
+        'batas_biaya'     => 'required|numeric|min:0'
+    ]);
 
-        $user = $request->user();
-        $device = Device::where('user_id', $user->id)->first();
+    $user = $request->user();
 
-        if (!$device) {
-            return response()->json(['message' => 'Device not found'], 404);
-        }
+    $device = Device::where(
+        'user_id',
+        $user->id
+    )->first();
 
-        $currentSetting = Setting::where('device_id', $device->device_id)->first();
-
-        if ($currentSetting && $currentSetting->tarif_id != $validated['tarif_id']) {
-            
-            DB::table('readings')
-                ->where('device_id', $device->device_id)
-                ->whereDate('created_at', Carbon::today())
-                ->delete();
-        }
-
-        // Update atau buat konfigurasi baru dengan menyertakan user_id
-        $setting = Setting::updateOrCreate(
-            [
-                'device_id'       => $device->device_id
-            ],
-            [
-                'user_id'         => $user->id, // 🛠️ REVISI: Mengikat user_id yang sedang login agar tidak Error 1364
-                'tarif_id'        => $validated['tarif_id'],
-                'batas_daya_watt' => $validated['batas_daya_watt'],
-                'batas_biaya'     => $validated['batas_biaya'],
-                'configured_at'   => now()
-            ]
-        );
-
+    if (!$device) {
         return response()->json([
-            'message' => 'Settings updated successfully',
-            'data'    => $setting
-        ]);
+            'message' => 'Device not found'
+        ], 404);
     }
 
-    // GET ALL TARIFF OPTIONS
-    public function getTariffs()
-    {
-        return response()->json(
-            Tariff::orderBy('daya_va')->get()
-        );
+    $currentSetting = Setting::where(
+        'device_id',
+        $device->device_id
+    )->first();
+
+    // CEK APAKAH TARIF BERUBAH, JIKA YA MAKA HAPUS READING HARI INI
+    if (
+        $currentSetting &&
+        $currentSetting->tarif_id != $validated['tarif_id']
+    ) {
+
+        DB::table('readings')
+            ->where(
+                'device_id',
+                $device->device_id
+            )
+            ->whereDate(
+                'created_at',
+                Carbon::today()
+            )
+            ->delete();
     }
+
+// CEK APAKAH BATAS BIAYA ATAU BATAS DAYA BERUBAH
+    $costLimitChanged =
+        $currentSetting &&
+        $currentSetting->batas_biaya != $validated['batas_biaya'];
+
+    $powerLimitChanged =
+        $currentSetting &&
+        $currentSetting->batas_daya_watt != $validated['batas_daya_watt'];
+
+// UPDATE OR CREATE SETTING
+    $updateData = [
+
+        'user_id' => $user->id,
+
+        'tarif_id' => $validated['tarif_id'],
+
+        'batas_daya_watt' =>
+            $validated['batas_daya_watt'],
+
+        'batas_biaya' =>
+            $validated['batas_biaya'],
+
+        'configured_at' => now(),
+    ];
+
+// RESET COST ALERT 
+    if ($costLimitChanged) {
+
+        $updateData['is_cost_alert_active'] = false;
+
+        $updateData['last_cost_alert_month'] = null;
+
+    } else {
+
+        $updateData['is_cost_alert_active'] =
+            $currentSetting->is_cost_alert_active
+            ?? false;
+
+        $updateData['last_cost_alert_month'] =
+            $currentSetting->last_cost_alert_month
+            ?? null;
+    }
+
+// RESET POWER ALERT
+    if ($powerLimitChanged) {
+
+        $updateData['is_power_alert_active'] = false;
+
+        $updateData['last_power_alert_month'] = null;
+
+    } else {
+
+        $updateData['is_power_alert_active'] =
+            $currentSetting->is_power_alert_active
+            ?? false;
+
+        $updateData['last_power_alert_month'] =
+            $currentSetting->last_power_alert_month
+            ?? null;
+    }
+
+    $setting = Setting::updateOrCreate(
+        [
+            'device_id' => $device->device_id
+        ],
+        $updateData
+    );
+
+    return response()->json([
+        'message' => 'Settings updated successfully',
+        'data' => $setting
+    ]);
+}
+
+public function getTariffs()
+{
+    $tariffs = Tariff::all();
+    return response()->json($tariffs);
+}
+
 }

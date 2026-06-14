@@ -19,33 +19,36 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $validated = $request->validate([
-            'username' => 'required|string|max:20',
+    'username' => 'required|string|max:20|unique:users,username',
 
-            'email' => 'required|email|ends_with:gmail.com|unique:users',
+    'email' => 'required|email|ends_with:gmail.com|unique:users,email',
 
-            'password' => [
-                'required',
-                'min:8',
-                'regex:/[A-Z]/',
-                'regex:/[0-9]/'
-            ],
+    'password' => [
+        'required',
+        'min:8',
+        'regex:/[A-Z]/',
+        'regex:/[0-9]/'
+    ],
 
-            'phone' => 'required'
-        ], [
-            'username.required' => 'Username is required',
-            'username.max' => 'Username must not exceed 20 characters',
+    'phone' => 'required|unique:users,phone'
 
-            'email.required' => 'Email is required',
-            'email.email' => 'Invalid email format',
-            'email.ends_with' => 'Email must use @gmail.com domain',
-            'email.unique' => 'Email is already registered',
+], [
+    'username.required' => 'Username is required',
+    'username.max' => 'Username must not exceed 20 characters',
+    'username.unique' => 'Username has been used',
 
-            'password.required' => 'Password is required',
-            'password.min' => 'Password must be at least 8 characters',
-            'password.regex' => 'Password must contain at least one uppercase letter and one number',
+    'email.required' => 'Email is required',
+    'email.email' => 'Invalid email format',
+    'email.ends_with' => 'Email must use @gmail.com domain',
+    'email.unique' => 'Email is already registered',
 
-            'phone.required' => 'Phone number is required'
-        ]);
+    'password.required' => 'Password is required',
+    'password.min' => 'Password must be at least 8 characters',
+    'password.regex' => 'Password must contain at least one uppercase letter and one number',
+
+    'phone.required' => 'Phone number is required',
+    'phone.unique' => 'Phone number is already registered'
+]);
 
         $user = User::create([
             'username' => $validated['username'],
@@ -406,7 +409,8 @@ class AuthController extends Controller
 
             'phone' => [
                 'required',
-                'numeric'
+                'numeric',
+                'unique:users,phone,' . $user->id
             ]
 
         ], [
@@ -424,7 +428,10 @@ class AuthController extends Controller
                 'Phone number is required',
 
             'phone.numeric' =>
-                'Phone number must contain numbers only'
+                'Phone number must contain numbers only',
+
+               'phone.unique' =>
+        'Phone number is already in use'
 
         ]);
 
@@ -540,7 +547,7 @@ class AuthController extends Controller
             Auth::login($user, true);
             $request->session()->regenerate();
             return redirect(
-                'http://localhost:3000/dashboard'
+                config('app.frontend_url') . '/dashboard'
             );
 
         } catch (\Exception $e) {
