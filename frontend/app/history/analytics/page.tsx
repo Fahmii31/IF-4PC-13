@@ -260,53 +260,76 @@ export default function HistoryAnalyticsPage() {
                   </h2>
                 </div>
 
-                <div className="h-64 flex items-end justify-between gap-1 pt-4 px-2 border-b border-gray-100">
-                  {chartData.map((item, index) => {
-                    const kwhHeight = (item.total_kwh / maxKwhInChart) * 100;
+                <div className="overflow-x-auto custom-scrollbar">
+                  <div
+                    className="h-80 flex items-end gap-1 pt-14 px-2 border-b border-gray-100"
+                    style={{
+                      minWidth: chartData.length > 15 ? `${chartData.length * 34}px` : "100%",
+                    }}
+                  >
+                    {chartData.map((item, index) => {
+                      const kwhHeight = (item.total_kwh / maxKwhInChart) * 100;
+                      const wattHeight = (item.avg_power / maxWattInChart) * 100;
 
-                    const wattHeight = (item.avg_power / maxWattInChart) * 100;
-                    return (
-                      <div
-                        key={index}
-                        className="flex-1 flex flex-col items-center group h-full justify-end relative"
-                      >
-                        <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 bg-gray-900 text-white text-[10px] py-2 px-3 rounded transition-opacity duration-200 pointer-events-none shadow-md whitespace-nowrap z-10">
-                          <div className="font-bold mb-1">{item.label}</div>
+                      return (
+                        <div
+                          key={index}
+                          className="flex-shrink-0 flex flex-col items-center justify-end group relative h-full"
+                          style={{
+                            width:
+                              chartData.length <= 10 ? `calc(100% / ${chartData.length})` : "32px",
+                          }}
+                        >
+                          {/* Tooltip */}
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 opacity-0 group-hover:opacity-100 bg-gray-900 text-white text-[10px] py-2 px-3 rounded-lg transition-all duration-200 pointer-events-none shadow-xl whitespace-nowrap z-50">
+                            <div className="font-bold mb-1">{item.label}</div>
 
-                          <div className="text-blue-300">kWh : {item.total_kwh.toFixed(2)}</div>
+                            <div className="text-blue-300">kWh : {item.total_kwh.toFixed(2)}</div>
 
-                          <div className="text-violet-300">Watt : {item.avg_power.toFixed(1)}</div>
+                            <div className="text-violet-300">
+                              Watt : {item.avg_power.toFixed(1)}
+                            </div>
+                          </div>
+
+                          {/* Bars */}
+                          <div className="flex items-end justify-center gap-[3px] h-full w-full">
+                            {/* kWh */}
+                            <div
+                              style={{
+                                height: `${item.total_kwh > 0 ? Math.max(kwhHeight, 4) : 0}%`,
+                              }}
+                              className={`rounded-t-md transition-all duration-500
+              w-[8px] sm:w-[10px] md:w-[12px]
+              ${
+                item.total_kwh > 0
+                  ? "bg-gradient-to-t from-blue-600 to-cyan-400 shadow-md shadow-blue-100"
+                  : "bg-gray-100"
+              }`}
+                            />
+
+                            {/* Watt */}
+                            <div
+                              style={{
+                                height: `${item.avg_power > 0 ? Math.max(wattHeight, 4) : 0}%`,
+                              }}
+                              className={`rounded-t-md transition-all duration-500
+              w-[8px] sm:w-[10px] md:w-[12px]
+              ${
+                item.avg_power > 0
+                  ? "bg-gradient-to-t from-violet-400 to-violet-300"
+                  : "bg-gray-100"
+              }`}
+                            />
+                          </div>
+
+                          {/* Label */}
+                          <span className="mt-3 text-[9px] sm:text-[10px] font-bold text-gray-400 whitespace-nowrap group-hover:text-blue-600 transition-colors">
+                            {item.label}
+                          </span>
                         </div>
-
-                        <div className="flex items-end gap-1 h-full">
-                          {/* KWH */}
-                          <div
-                            style={{
-                              height: `${item.total_kwh > 0 ? Math.max(kwhHeight, 4) : 0}%`,
-                            }}
-                            className={`w-[14px] sm:w-[18px] rounded-t-md transition-all duration-500
-      ${
-        item.total_kwh > 0
-          ? "bg-gradient-to-t from-blue-600 to-cyan-400 shadow-md shadow-blue-100"
-          : "bg-gray-100"
-      }`}
-                          />
-
-                          {/* WATT */}
-                          <div
-                            style={{
-                              height: `${item.avg_power > 0 ? Math.max(wattHeight, 4) : 0}%`,
-                            }}
-                            className={`w-[14px] sm:w-[10px] rounded-t-md transition-all duration-500
-      ${item.avg_power > 0 ? "bg-gradient-to-t from-violet-400 to-violet-300" : "bg-gray-100"}`}
-                          />
-                        </div>
-                        <span className="text-[10px] font-bold text-gray-400 mt-3 group-hover:text-blue-600 transition-colors">
-                          {item.label}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-center gap-6 text-[11px] text-gray-400 font-medium">

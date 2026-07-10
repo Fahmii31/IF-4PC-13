@@ -97,11 +97,7 @@ export default function SettingsPage() {
 
   // CHANGE VA DIRECTLY TO BACKEND SO IT WON'T RESET ON REFRESH
   const handleVACapacityChange = async (value: string) => {
-    if (value === "") {
-      setMeterCapacity("");
-      setSelectedTariffId(null);
-      return;
-    }
+    if (value === "") return;
 
     const selectedTariff = tariffs.find((item) => `${item.daya_va} VA` === value);
 
@@ -270,7 +266,7 @@ export default function SettingsPage() {
                     onChange={(e) => handleVACapacityChange(e.target.value)}
                     className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-blue-500 focus:bg-white appearance-none font-black text-gray-700 cursor-pointer transition-all hover:border-blue-200 shadow-sm disabled:opacity-50"
                   >
-                    <option value="">Not Set</option>
+                    {!selectedTariffId && <option value="">Not Set</option>}
 
                     {tariffs.map((tariff) => (
                       <option key={tariff.tarif_id} value={`${tariff.daya_va} VA`}>
