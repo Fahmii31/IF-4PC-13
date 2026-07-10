@@ -58,9 +58,12 @@ export default function DashboardPage() {
   const [chartMode, setChartMode] = useState<"watt" | "kwh">("kwh");
   const prevExceededRef = useRef(false);
   const [dismissedPowerAlert, setDismissedPowerAlert] = useState(false);
+  const relayStatusRef = useRef(false);
 
   const isPowerExceeded =
-    userLimits.isConfigured && Number(metrics.daya_watt) > Number(userLimits.batas_daya_watt);
+    userLimits.isConfigured &&
+    Number(userLimits.batas_daya_watt) > 0 &&
+    Number(metrics.daya_watt) > Number(userLimits.batas_daya_watt);
 
   const showPowerPopup = isPowerExceeded && !dismissedPowerAlert;
 
@@ -82,6 +85,8 @@ export default function DashboardPage() {
         if (!isToggling) {
           setDeviceInfo(jsonOverview.device);
         }
+
+        relayStatusRef.current = !!jsonOverview.device.status_relay;
 
         setMetrics(
           jsonOverview.device.status_relay
@@ -127,20 +132,20 @@ export default function DashboardPage() {
   useEffect(() => {
     const init = async () => {
       await Promise.all([fetchSettings(), syncDashboard()]);
-
       setIsLoading(false);
     };
 
     init();
 
     const interval = setInterval(syncDashboard, 10000);
-
     return () => clearInterval(interval);
   }, [syncDashboard, fetchSettings]);
 
   useEffect(() => {
     const isExceeded =
-      userLimits.isConfigured && Number(metrics.daya_watt) > Number(userLimits.batas_daya_watt);
+      userLimits.isConfigured &&
+      Number(userLimits.batas_daya_watt) > 0 &&
+      Number(metrics.daya_watt) > Number(userLimits.batas_daya_watt);
 
     if (!prevExceededRef.current && isExceeded) {
       setDismissedPowerAlert(false);
@@ -154,11 +159,13 @@ export default function DashboardPage() {
     setIsToggling(true);
 
     const target = !deviceInfo.status_relay;
+
+    // Optimistic UI update
     setDeviceInfo((prev) => ({ ...prev, status_relay: target }));
 
     try {
       const res = await fetch(`${API_URL}/device/toggle-relay`, {
-        method: "PATCH",
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-XSRF-TOKEN": decodeURIComponent(Cookies.get("XSRF-TOKEN") || ""),
@@ -167,11 +174,21 @@ export default function DashboardPage() {
         credentials: "include",
       });
 
-      if (!res.ok) throw new Error();
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Gagal update relay");
+      }
+
+      if (data?.status_relay !== undefined) {
+        setDeviceInfo((prev) => ({ ...prev, status_relay: data.status_relay }));
+      }
+
       syncDashboard();
-    } catch {
+    } catch (err) {
       setDeviceInfo((prev) => ({ ...prev, status_relay: !target }));
-      alert("Failed to update relay status.");
+      console.error("Toggle relay gagal:", err);
+      alert("Gagal mengubah status relay. Coba lagi.");
     } finally {
       setIsToggling(false);
     }
@@ -203,19 +220,14 @@ export default function DashboardPage() {
         onNotificationClick={() => setIsNotificationOpen(true)}
       >
         {showPowerPopup && (
-          // w-full memastikan lebarnya otomatis pas dan sejajar dengan komponen dashboard lainnya
           <div className="w-full mb-5 animate-in fade-in duration-200">
-            {/* Tetap mempertahankan tinggi yang ramping (p-3) agar estetik */}
             <div className="flex items-center justify-between bg-red-50/70 border border-red-100 rounded-xl p-3 sm:px-5 sm:py-3 shadow-sm shadow-red-500/[0.02] gap-3">
-              {/* Sisi Kiri: Ikon + Teks tetap sejajar horizontal di mobile & desktop */}
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                {/* Ukuran Ikon Padat */}
                 <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-red-500 to-red-600 text-white shadow-sm shadow-red-500/10 shrink-0">
                   <AlertTriangle size={18} className="sm:hidden" />
                   <AlertTriangle size={20} className="hidden sm:block" />
                 </div>
 
-                {/* Kontainer Teks Sleek & Compact */}
                 <div className="min-w-0 flex-1">
                   <h3 className="font-bold text-red-950 text-xs sm:text-sm tracking-tight leading-tight">
                     Alert: Power Limit Exceeded
@@ -235,7 +247,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Sisi Kanan: Tombol Dismiss Minimalis */}
               <button
                 onClick={handleDismissPowerAlert}
                 className="font-bold text-[10px] sm:text-xs uppercase tracking-wider text-red-700 hover:text-red-900 hover:bg-red-100/60 px-2.5 py-1.5 rounded-lg transition-all duration-200 shrink-0"
@@ -245,6 +256,7 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+
         {!userLimits.isConfigured && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-amber-50 border border-amber-200 text-amber-800 px-4 md:px-6 py-4 rounded-xl mb-6 gap-4 shadow-sm animate-pulse">
             <div>
@@ -340,7 +352,7 @@ export default function DashboardPage() {
                 }}
                 className={`w-20 md:w-24 h-10 md:h-12 rounded-full flex items-center transition-all duration-300 px-1 
                   ${
-                    !deviceInfo.is_online
+                    !deviceInfo.is_online || isToggling
                       ? "bg-gray-200 cursor-not-allowed justify-start opacity-50"
                       : deviceInfo.status_relay
                         ? "bg-blue-600 justify-end shadow-md shadow-blue-100"
@@ -348,26 +360,42 @@ export default function DashboardPage() {
                   }`}
               >
                 <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
-                  <Zap
-                    size={18}
-                    className={
-                      !deviceInfo.is_online
-                        ? "text-gray-300"
-                        : deviceInfo.status_relay
-                          ? "text-blue-600"
-                          : "text-gray-400"
-                    }
-                    fill={deviceInfo.is_online && deviceInfo.status_relay ? "currentColor" : "none"}
-                  />
+                  {isToggling ? (
+                    <Loader2 size={16} className="text-blue-400 animate-spin" />
+                  ) : (
+                    <Zap
+                      size={18}
+                      className={
+                        !deviceInfo.is_online
+                          ? "text-gray-300"
+                          : deviceInfo.status_relay
+                            ? "text-blue-600"
+                            : "text-gray-400"
+                      }
+                      fill={
+                        deviceInfo.is_online && deviceInfo.status_relay ? "currentColor" : "none"
+                      }
+                    />
+                  )}
                 </div>
               </button>
 
               <p
-                className={`mt-6 font-bold tracking-wider text-[9px] sm:text-[10px] md:text-xs whitespace-nowrap uppercase ${!userLimits.isConfigured ? "text-amber-600" : deviceInfo.status_relay ? "text-blue-600" : "text-gray-500"}`}
+                className={`mt-6 font-bold tracking-wider text-[9px] sm:text-[10px] md:text-xs whitespace-nowrap uppercase ${
+                  !userLimits.isConfigured
+                    ? "text-amber-600"
+                    : isToggling
+                      ? "text-gray-400"
+                      : deviceInfo.status_relay
+                        ? "text-blue-600"
+                        : "text-gray-500"
+                }`}
               >
                 {!userLimits.isConfigured
                   ? "SYSTEM: CONFIGURATION REQUIRED"
-                  : `SYSTEM: POWER ${deviceInfo.status_relay ? "ON" : "OFF"}`}
+                  : isToggling
+                    ? "SYSTEM: UPDATING..."
+                    : `SYSTEM: POWER ${deviceInfo.status_relay ? "ON" : "OFF"}`}
               </p>
             </div>
 
@@ -422,15 +450,14 @@ export default function DashboardPage() {
                 <button
                   onClick={() => setChartMode("watt")}
                   className={`px-3 py-1 rounded-full text-[10px] md:text-sm font-bold uppercase transition
-      ${chartMode === "watt" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500"}`}
+                    ${chartMode === "watt" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500"}`}
                 >
                   Watt
                 </button>
-
                 <button
                   onClick={() => setChartMode("kwh")}
                   className={`px-3 py-1 rounded-full text-[10px] md:text-sm font-bold uppercase transition
-      ${chartMode === "kwh" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500"}`}
+                    ${chartMode === "kwh" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500"}`}
                 >
                   kWh
                 </button>

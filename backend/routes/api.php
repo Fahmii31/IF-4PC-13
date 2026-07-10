@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\DummyDataController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NotificationController;
@@ -16,31 +15,23 @@ Route::get('/test', function () {
 
 // PUBLIC
 Route::post('/register', [AuthController::class, 'register']);
-
 Route::get('/reset-session', [AuthController::class, 'checkResetSession']);
-
 Route::get('/otp-session', [AuthController::class, 'checkOtpSession']);
-
-Route::get('/generate-dummy',[DummyDataController::class, 'generate']);
 
 // PROTECTED
 Route::middleware('auth:sanctum')->group(function () {
 
-    Route::get('/me', function (Illuminate\Http\Request $request) {
-        return $request->user(); });
+    Route::get('/me', fn(Illuminate\Http\Request $r) => $r->user());
 
     Route::get('/dashboard/overview', [DashboardController::class, 'getDashboardOverview']);
-    
     Route::patch('/device/toggle-relay', [DashboardController::class, 'toggleRelay']);
+    Route::post('/device/toggle-relay', [DashboardController::class, 'toggleRelay']);
 
     Route::put('/update-profile', [AuthController::class, 'updateProfile']);
-
     Route::post('/change-password', [AuthController::class, 'changePassword']);
 
-    Route::get('/settings',[SettingController::class, 'getSetting']);
-
+    Route::get('/settings', [SettingController::class, 'getSetting']);
     Route::put('/settings', [SettingController::class, 'updateSetting']);
-
     Route::get('/tariffs', [SettingController::class, 'getTariffs']);
 
     Route::get('/history/daily', [HistoryController::class, 'getDailyHistory']);
