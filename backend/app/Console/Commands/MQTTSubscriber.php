@@ -21,11 +21,7 @@ class MQTTSubscriber extends Command
 
         $clientId = 'laravel_subscriber_' . rand(1000, 9999);
 
-        $mqtt = new MqttClient(
-            $server,
-            $port,
-            $clientId
-        );
+        $mqtt = new MqttClient($server, $port, $clientId);
 
         $mqtt->connect();
 
@@ -48,17 +44,24 @@ class MQTTSubscriber extends Command
 
             $deviceId = 3;
 
-            $device = Device::find($deviceId);
+            // Ambil device beserta setting
+            $device = Device::with('setting')->find($deviceId);
 
             if (!$device) {
                 echo "Device not found\n";
                 return;
             }
 
-            $tariff = Tariff::where('daya_va', $device->daya_va)->first();
+            if (!$device->setting) {
+                echo "Setting not found for device {$deviceId}\n";
+                return;
+            }
+
+            // Ambil tarif berdasarkan tarif_id
+            $tariff = Tariff::find($device->setting->tarif_id);
 
             if (!$tariff) {
-                echo "Tariff for {$device->daya_va} VA not found\n";
+                echo "Tariff ID {$device->setting->tarif_id} not found\n";
                 return;
             }
 
@@ -78,7 +81,6 @@ class MQTTSubscriber extends Command
                 echo "✅ Data saved successfully\n";
 
             } catch (\Exception $e) {
-
                 echo "Database Error\n";
                 echo $e->getMessage() . PHP_EOL;
             }
