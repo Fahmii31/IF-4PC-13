@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import { useRouter, usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 import LogoBlue from "@/components/LogoBlue";
 
@@ -32,21 +32,19 @@ type SidebarProps = {
 export default function Sidebar({ user, isOpen, onClose, onLogout }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [isHistoryOpen, setIsHistoryOpen] = useState(() => pathname.startsWith("/history"));
+  const [prevPathname, setPrevPathname] = useState(pathname);
 
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-
-  useEffect(() => {
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
     if (pathname.startsWith("/history")) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsHistoryOpen(true);
     }
-  }, [pathname]);
+  }
 
   const isDashboard = pathname === "/dashboard";
   const isSettings = pathname === "/settings";
-
-  const isHistory =
-    pathname === "/history" || pathname === "/history/monthly" || pathname === "/history/yearly";
+  const isHistory = pathname === "/history" || pathname === "/history/analytics";
 
   return (
     <aside
@@ -57,7 +55,7 @@ export default function Sidebar({ user, isOpen, onClose, onLogout }: SidebarProp
         md:translate-x-0 md:relative md:flex-shrink-0
       `}
     >
-      {/* 1. BAGIAN ATAS & MENU UTAMA (SCROLLABLE jika menu banyak) */}
+      {/* 1. BAGIAN ATAS & MENU UTAMA */}
       <div className="flex-1 overflow-y-auto">
         <div className="flex items-center justify-between p-6 mb-4">
           <div className="flex items-center gap-3">
@@ -117,7 +115,7 @@ export default function Sidebar({ user, isOpen, onClose, onLogout }: SidebarProp
 
             {isHistoryOpen && (
               <div className="ml-9 space-y-1 pr-2">
-                {/* Opsi 1: Consumption */}
+                {/* SUB-MENU CONSUMPTION (Rute Utama History) */}
                 <button
                   onClick={() => {
                     router.push("/history");
@@ -135,7 +133,7 @@ export default function Sidebar({ user, isOpen, onClose, onLogout }: SidebarProp
                   Consumption
                 </button>
 
-                {/* PERBAIKAN Opsi 2: Menggabungkan Monthly & Yearly menjadi Energy Analytics */}
+                {/* SUB-MENU ANALYTICS */}
                 <button
                   onClick={() => {
                     router.push("/history/analytics");
@@ -177,7 +175,7 @@ export default function Sidebar({ user, isOpen, onClose, onLogout }: SidebarProp
         </nav>
       </div>
 
-      {/* 2. BAGIAN FOOTER (USER DI ATAS LOGOUT, FIX DI BAWAH) */}
+      {/* 2. BAGIAN FOOTER */}
       <div className="p-4 border-t border-gray-100 space-y-3 bg-white">
         {/* INFO USER */}
         {user && (
@@ -188,45 +186,28 @@ export default function Sidebar({ user, isOpen, onClose, onLogout }: SidebarProp
             }}
             className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-2xl hover:bg-gray-100/80 transition-all cursor-pointer group"
           >
-            {/* Avatar Section */}
             <div className="relative">
               <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md shadow-blue-200 group-hover:scale-105 transition-transform">
                 {user?.username ? user.username.charAt(0).toUpperCase() : "U"}
               </div>
-              {/* Status Online Indicator */}
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></div>
             </div>
 
-            {/* User Info Section */}
             <div className="flex-1 min-w-0">
               <p className="font-bold text-sm text-gray-900 truncate tracking-tight">
                 {user?.username || "Loading..."}
               </p>
               <p className="text-[10px] text-gray-500 truncate font-medium">{user?.email || ""}</p>
             </div>
-
-            {/* Arrow Icon */}
-            <div className="text-gray-300 group-hover:text-blue-600 transition-colors">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </div>
           </div>
         )}
 
         {/* BUTTON LOGOUT */}
         <button
-          onClick={onLogout}
+          onClick={() => {
+            onLogout();
+            onClose();
+          }}
           className="flex items-center justify-center gap-2 w-full py-3 text-red-500 border border-red-100 rounded-xl hover:bg-red-50 font-medium transition"
         >
           <LogOut size={18} />

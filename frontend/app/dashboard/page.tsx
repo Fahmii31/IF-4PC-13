@@ -17,7 +17,6 @@ import Cookies from "js-cookie";
 import Notifications from "@/components/Notifications";
 import MainLayout from "@/components/layout/MainLayout";
 import { useAuth } from "@/hooks/useAuth";
-import { logoutUser } from "@/lib/logout";
 
 const API_URL = "http://localhost:8000/api";
 
@@ -160,7 +159,6 @@ export default function DashboardPage() {
 
     const target = !deviceInfo.status_relay;
 
-    // Optimistic UI update
     setDeviceInfo((prev) => ({ ...prev, status_relay: target }));
 
     try {
@@ -194,11 +192,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleLogout = async () => {
-    await logoutUser();
-    router.replace("/login");
-  };
-
   const handleDismissPowerAlert = () => {
     setDismissedPowerAlert(true);
   };
@@ -216,7 +209,6 @@ export default function DashboardPage() {
       <MainLayout
         title="Dashboard Overview"
         user={user}
-        onLogout={handleLogout}
         onNotificationClick={() => setIsNotificationOpen(true)}
       >
         {showPowerPopup && (
