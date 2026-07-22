@@ -5,12 +5,12 @@ import { RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
+import toast from "react-hot-toast";
 
 export default function VerifyOtpPage() {
   const router = useRouter();
   const [otp, setOtp] = useState("");
   const [timer, setTimer] = useState(59);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const canResend = timer <= 0;
 
@@ -20,44 +20,28 @@ export default function VerifyOtpPage() {
         const res = await fetch("http://localhost:8000/api/reset-session", {
           credentials: "include",
         });
-
         const data = await res.json();
-
-        if (!data.valid) {
-          router.push("/forgot-password");
-        }
+        if (!data.valid) router.push("/forgot-password");
       } catch {
         router.push("/forgot-password");
       }
     };
-
     checkSession();
   }, [router]);
 
   useEffect(() => {
     if (timer <= 0) return;
-
-    const timeoutId = setTimeout(() => {
-      setTimer(timer - 1);
-    }, 1000);
-
+    const timeoutId = setTimeout(() => setTimer(timer - 1), 1000);
     return () => clearTimeout(timeoutId);
   }, [timer]);
 
   const handleResend = async () => {
     if (!canResend) return;
-
-    setError("");
-
     setTimer(59);
 
     try {
-      await fetch("http://localhost:8000/sanctum/csrf-cookie", {
-        credentials: "include",
-      });
-
+      await fetch("http://localhost:8000/sanctum/csrf-cookie", { credentials: "include" });
       const token = Cookies.get("XSRF-TOKEN");
-
       const res = await fetch("http://localhost:8000/forgot-password", {
         method: "POST",
         credentials: "include",
@@ -67,40 +51,28 @@ export default function VerifyOtpPage() {
           "X-Requested-With": "XMLHttpRequest",
           "X-XSRF-TOKEN": decodeURIComponent(token || ""),
         },
-
         body: JSON.stringify({}),
       });
 
       const data = await res.json();
-
       if (!res.ok) {
-        setError(data.message || "Failed to resend OTP");
-
+        toast.error(data.message || "Failed to resend OTP");
         return;
       }
-
-      alert(data.message || "OTP has been resent");
+      toast.success(data.message || "OTP has been resent");
     } catch (err) {
       console.error(err);
-
-      setError("Failed to resend OTP");
+      toast.error("Failed to resend OTP");
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    setError("");
-
     setLoading(true);
 
     try {
-      await fetch("http://localhost:8000/sanctum/csrf-cookie", {
-        credentials: "include",
-      });
-
+      await fetch("http://localhost:8000/sanctum/csrf-cookie", { credentials: "include" });
       const token = Cookies.get("XSRF-TOKEN");
-
       const res = await fetch("http://localhost:8000/verify-otp", {
         method: "POST",
         credentials: "include",
@@ -110,59 +82,41 @@ export default function VerifyOtpPage() {
           "X-Requested-With": "XMLHttpRequest",
           "X-XSRF-TOKEN": decodeURIComponent(token || ""),
         },
-
-        body: JSON.stringify({
-          otp,
-        }),
+        body: JSON.stringify({ otp }),
       });
 
       const data = await res.json();
-
       if (!res.ok) {
-        setError(data.message || "Invalid OTP");
-
+        toast.error(data.message || "Invalid OTP");
         return;
       }
 
-      alert(data.message || "OTP successfully verified");
-
+      toast.success(data.message || "OTP successfully verified");
       setOtp("");
-
       router.push("/reset-password");
     } catch (err) {
       console.error(err);
-
-      setError("Server error. Please try again later.");
+      toast.error("Server error. Please try again later.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-200 p-6">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8">
-        <div className="flex flex-col items-center mb-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50 to-blue-100/50 p-6">
+      <div className="w-full max-w-[400px] bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 p-8">
+        <div className="flex flex-col items-center mb-8">
           <LogoBlue />
-          <h1 className="text-blue-600 font-bold text-lg sm:text-xl mt-3">
-            VoltCore
-          </h1>
-          <p className="text-xs tracking-widest text-gray-500">
-            POWER INTELLIGENCE
-          </p>
+          <h1 className="text-blue-600 font-bold text-lg mt-3 tracking-wide">VoltCore</h1>
+          <p className="text-[10px] tracking-[0.2em] text-gray-400 mt-0.5">POWER INTELLIGENCE</p>
         </div>
 
-        <h2 className="text-lg sm:text-xl font-semibold text-center text-gray-900 mb-2">
-          Verify Email
-        </h2>
-        <p className="text-center text-gray-500 mb-8 text-sm">
-          Enter the 6-digit code we sent to your email.
-        </p>
-
-        {error && (
-          <div className="bg-red-50 text-red-600 p-2 mb-4 rounded text-sm">
-            {error}
-          </div>
-        )}
+        <div className="text-center mb-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-1.5">Verify Email</h2>
+          <p className="text-xs text-gray-500 leading-relaxed px-2">
+            Enter the 6-digit code we sent to your email.
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="relative flex justify-center items-center">
@@ -174,13 +128,21 @@ export default function VerifyOtpPage() {
               className="absolute inset-0 w-full h-full opacity-0 cursor-text z-10"
               autoFocus
             />
-            <div className="flex gap-2 sm:gap-3">
+            <div className="flex gap-2">
               {[0, 1, 2, 3, 4, 5].map((index) => (
                 <div
                   key={index}
-                  className={`w-10 h-12 sm:w-12 sm:h-14 flex items-center justify-center text-lg sm:text-xl font-bold rounded-xl border-2 transition-all 
-                  ${otp.length === index ? "border-blue-500 bg-white ring-2 ring-blue-100" : "border-transparent bg-gray-100"}
-                  ${otp.length > index ? "text-gray-900" : "text-transparent"}`}
+                  className={`w-10 h-12 flex items-center justify-center text-lg font-semibold rounded-xl border transition-all duration-200 
+                  ${
+                    otp.length === index
+                      ? "border-blue-500 bg-white ring-4 ring-blue-500/10 shadow-sm"
+                      : "border-gray-200 bg-gray-50"
+                  }
+                  ${
+                    otp.length > index
+                      ? "text-gray-800 border-gray-300 bg-white"
+                      : "text-transparent"
+                  }`}
                 >
                   {otp[index] || "•"}
                 </div>
@@ -191,9 +153,9 @@ export default function VerifyOtpPage() {
           <button
             type="submit"
             disabled={otp.length !== 6 || loading}
-            className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition shadow-md active:scale-[0.98] disabled:bg-gray-300 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 text-white text-sm py-3 rounded-xl font-medium hover:bg-blue-700 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
           >
-            {loading ? "Verifying..." : "CONFIRM"}
+            {loading ? "Verifying..." : "Confirm Code"}
           </button>
         </form>
 
@@ -202,17 +164,15 @@ export default function VerifyOtpPage() {
             <button
               type="button"
               onClick={handleResend}
-              className="flex items-center gap-2 text-blue-600 font-semibold hover:underline text-sm"
+              className="flex items-center gap-1.5 text-blue-600 font-medium hover:text-blue-700 transition-colors text-xs"
             >
-              <RefreshCw size={16} />
+              <RefreshCw size={14} />
               Resend Code
             </button>
           ) : (
-            <p className="text-gray-400 text-sm">
+            <p className="text-gray-400 text-xs font-medium">
               Resend code in{" "}
-              <span className="font-mono text-blue-500">
-                0:{timer < 10 ? `0${timer}` : timer}
-              </span>
+              <span className="font-mono text-blue-500">0:{timer < 10 ? `0${timer}` : timer}</span>
             </p>
           )}
         </div>

@@ -7,6 +7,7 @@ import { User, Mail, Phone, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { registerUser } from "@/lib/auth";
+import toast from "react-hot-toast";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -58,20 +59,21 @@ export default function RegisterPage() {
     e.preventDefault();
     const newErrors: RegisterErrors = {};
 
-    // VALIDASI EMAIL
     if (!formData.email.toLowerCase().endsWith("@gmail.com")) {
       newErrors.email = ["Email must use @gmail.com"];
     }
 
-    // VALIDASI PASSWORD MATCH
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match";
     }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
+      toast.error("Please check the form for errors");
       return;
     }
+
+    const toastId = toast.loading("Creating your account...");
 
     try {
       const res = await registerUser({
@@ -83,21 +85,21 @@ export default function RegisterPage() {
 
       const result = await res.json();
 
-      // VALIDATION ERROR
       if (!res.ok) {
         if (res.status === 422 && result.errors) {
           setErrors(result.errors);
+          toast.error("Validation failed", { id: toastId });
         } else {
-          alert(result.message || "Register failed");
+          toast.error(result.message || "Register failed", { id: toastId });
         }
         return;
       }
 
-      alert(result.message || "Register success 🎉");
+      toast.success(result.message || "Register success 🎉", { id: toastId });
       router.replace("/login");
     } catch (error) {
       console.error(error);
-      alert("Server error");
+      toast.error("Server error. Please try again later.", { id: toastId });
     }
   };
 

@@ -5,6 +5,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
+import toast from "react-hot-toast";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -15,7 +16,6 @@ export default function ResetPasswordPage() {
     confirmPassword: "",
   });
 
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -24,147 +24,93 @@ export default function ResetPasswordPage() {
         const res = await fetch("http://localhost:8000/api/otp-session", {
           credentials: "include",
         });
-
         const data = await res.json();
-
-        if (!data.valid) {
-          router.push("/forgot-password");
-        }
+        if (!data.valid) router.push("/forgot-password");
       } catch {
         router.push("/forgot-password");
       }
     };
-
     checkSession();
   }, [router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    setError("");
-
     setLoading(true);
 
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-
+      toast.error("Passwords do not match");
       setLoading(false);
-
       return;
     }
 
     const passwordRegex = /^(?=.*[A-Z])(?=.*[0-9]).{8,}$/;
-
     if (!passwordRegex.test(formData.password)) {
-      setError(
-        "Password must be at least 8 characters, include 1 uppercase letter and 1 number",
+      toast.error(
+        "Password must be at least 8 characters, include 1 uppercase letter and 1 number"
       );
-
       setLoading(false);
-
       return;
     }
 
     try {
-      await fetch("http://localhost:8000/sanctum/csrf-cookie", {
-        credentials: "include",
-      });
-
+      await fetch("http://localhost:8000/sanctum/csrf-cookie", { credentials: "include" });
       const token = Cookies.get("XSRF-TOKEN");
-
       const res = await fetch("http://localhost:8000/reset-password", {
         method: "POST",
         credentials: "include",
-
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
           "X-Requested-With": "XMLHttpRequest",
           "X-XSRF-TOKEN": decodeURIComponent(token || ""),
         },
-
-        body: JSON.stringify({
-          password: formData.password,
-        }),
+        body: JSON.stringify({ password: formData.password }),
       });
 
       const data = await res.json();
-
       if (!res.ok) {
-        setError(data.message || "Reset password failed");
-
+        toast.error(data.message || "Reset password failed");
         return;
       }
 
-      alert(data.message || "Password has been successfully updated");
-
+      toast.success(data.message || "Password updated successfully");
       router.push("/login");
     } catch (err) {
       console.error(err);
-
-      setError("Server error. Please try again later.");
+      toast.error("Server error. Please try again later.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      className="
-      min-h-screen 
-      flex items-center justify-center
-      bg-gradient-to-br from-white via-blue-50 to-blue-200
-      px-4 py-8 sm:px-6
-    "
-    >
-      <div
-        className="
-        w-full max-w-md
-        bg-white
-        rounded-[2rem]
-        shadow-2xl
-        p-6 sm:p-8
-      "
-      >
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50 to-blue-100/50 px-4 py-8 sm:px-6">
+      <div className="w-full max-w-[400px] bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 p-8">
         {/* LOGO */}
-        <div className="flex flex-col items-center mb-6 sm:mb-8">
+        <div className="flex flex-col items-center mb-8">
           <LogoBlue />
-
-          <h1 className="text-blue-600 font-bold text-xl mt-3">VoltCore</h1>
-
-          <p className="text-[10px] sm:text-xs tracking-[0.25em] text-gray-500 text-center">
-            POWER INTELLIGENCE
-          </p>
+          <h1 className="text-blue-600 font-bold text-lg mt-3 tracking-wide">VoltCore</h1>
+          <p className="text-[10px] tracking-[0.2em] text-gray-400 mt-0.5">POWER INTELLIGENCE</p>
         </div>
 
         {/* TITLE */}
         <div className="text-center mb-8">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            New Password
-          </h2>
-
-          <p className="text-sm sm:text-base text-gray-500 leading-relaxed">
+          <h2 className="text-lg font-semibold text-gray-800 mb-1.5">New Password</h2>
+          <p className="text-xs text-gray-500 leading-relaxed px-2">
             Set your new password to regain access to your hub.
           </p>
         </div>
 
         {/* FORM */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* PASSWORD */}
           <div>
-            <label className="text-sm text-gray-600 mb-2 block">
-              New Password
-            </label>
-
+            <label className="text-xs font-medium text-gray-600 mb-1.5 block">New Password</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -172,43 +118,24 @@ export default function ResetPasswordPage() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="********"
-                className="
-                w-full
-                h-12 sm:h-14
-                px-4 pr-12
-                rounded-xl
-                bg-gray-100
-                text-gray-900
-                placeholder-gray-400
-                focus:outline-none
-                focus:ring-2
-                focus:ring-blue-500
-                transition
-                text-sm sm:text-base
-              "
+                placeholder="••••••••"
+                className="w-full text-sm px-4 py-3 pr-10 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-200"
               />
-
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="
-                absolute right-4 top-1/2 -translate-y-1/2
-                text-gray-400 hover:text-blue-600
-                transition
-              "
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition-colors"
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
 
           {/* CONFIRM PASSWORD */}
           <div>
-            <label className="text-sm text-gray-600 mb-2 block">
+            <label className="text-xs font-medium text-gray-600 mb-1.5 block">
               Confirm Password
             </label>
-
             <div className="relative">
               <input
                 type={showConfirmPassword ? "text" : "password"}
@@ -216,60 +143,26 @@ export default function ResetPasswordPage() {
                 required
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                placeholder="********"
-                className="
-                w-full
-                h-12 sm:h-14
-                px-4 pr-12
-                rounded-xl
-                bg-gray-100
-                text-gray-900
-                placeholder-gray-400
-                focus:outline-none
-                focus:ring-2
-                focus:ring-blue-500
-                transition
-                text-sm sm:text-base
-              "
+                placeholder="••••••••"
+                className="w-full text-sm px-4 py-3 pr-10 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-200"
               />
-
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="
-                absolute right-4 top-1/2 -translate-y-1/2
-                text-gray-400 hover:text-blue-600
-                transition
-              "
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition-colors"
               >
-                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
-
-          {/* ERROR */}
-          {error && (
-            <div
-              className="
-              bg-red-50
-              border border-red-200
-              text-red-600
-              text-sm
-              px-4 py-3
-              rounded-xl
-            "
-            >
-              {error}
-            </div>
-          )}
 
           {/* BUTTON */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-12 sm:h-14 bg-blue-600 text-white rounded-xl font-semibold text-sm sm:text-base hover:bg-blue-700 transition shadow-lg shadow-blue-100 active:scale-[0.98] mt-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 text-white text-sm py-3 rounded-xl font-medium hover:bg-blue-700 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] mt-2 disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
           >
-            {loading ? "Processing..." : "CONFIRM"}
+            {loading ? "Processing..." : "Update Password"}
           </button>
         </form>
       </div>

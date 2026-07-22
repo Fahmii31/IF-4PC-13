@@ -117,19 +117,22 @@ class AuthController extends Controller
     // LOGOUT
     public function logout(Request $request)
     {
-        $user = $request->user();
+        if (Auth::check()) {
+            Auth::logout();
+            
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
-        if ($user) {
-            $user->setRememberToken(null);
-            $user->save();
+            return response()->json([
+                'message' => 'Logout success. See you again!'
+            ], 200);
         }
-        Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+
         return response()->json([
-            'message' => 'Logout success'
-        ]);
+            'message' => 'No active session found.'
+        ], 401);
     }
+
     // FORGOT PASSWORD
     public function forgotPassword(Request $request)
     {
@@ -149,7 +152,6 @@ class AuthController extends Controller
             ], 404);
         }
 
-        // GOOGLE ACCOUNT
         if ($user->is_google_user) {
 
             return response()->json([
@@ -157,13 +159,11 @@ class AuthController extends Controller
             ], 400);
         }
 
-        // SIMPAN EMAIL KE SESSION
         session([
             'password_reset_email' =>
                 $validated['email']
         ]);
 
-        // GENERATE OTP
         $otp = str_pad(
             random_int(0, 999999),
             6,
@@ -171,7 +171,6 @@ class AuthController extends Controller
             STR_PAD_LEFT
         );
 
-        // SIMPAN OTP HASH
         Otp::updateOrCreate(
 
             [
@@ -217,7 +216,6 @@ class AuthController extends Controller
             'otp' => 'required|digits:6'
         ]);
 
-        // AMBIL EMAIL DARI SESSION
         $email = session(
             'password_reset_email'
         );
@@ -241,7 +239,6 @@ class AuthController extends Controller
             ], 400);
         }
 
-        // CEK LOCK
         if (
             $record->locked_until &&
             now()->lt($record->locked_until)
@@ -253,7 +250,6 @@ class AuthController extends Controller
             ], 429);
         }
 
-        // OTP SUDAH DIGUNAKAN
         if ($record->is_verified) {
 
             return response()->json([
@@ -292,14 +288,14 @@ class AuthController extends Controller
             ], 400);
         }
 
-        // VERIFY OTP
+
         $record->update([
             'is_verified' => true,
             'attempts' => 0,
             'locked_until' => null
         ]);
 
-        // SESSION VERIFIED
+
         session([
             'otp_verified' => true
         ]);
@@ -313,7 +309,6 @@ class AuthController extends Controller
     // RESET PASSWORD
     public function resetPassword(Request $request)
     {
-        // CEK SESSION
         if (
             !session('password_reset_email') ||
             !session('otp_verified')
@@ -357,7 +352,6 @@ class AuthController extends Controller
             ], 404);
         }
 
-        // CEK PASSWORD LAMA
         if (
             Hash::check(
                 $validated['password'],
@@ -377,13 +371,11 @@ class AuthController extends Controller
             )
         ]);
 
-        // HAPUS OTP
         Otp::where(
             'email',
             $email
         )->delete();
 
-        // HAPUS SESSION RESET
         session()->forget([
             'password_reset_email',
             'otp_verified'

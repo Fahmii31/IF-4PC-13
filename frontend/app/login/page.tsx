@@ -7,39 +7,32 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginUser, getAuthUser } from "@/lib/auth";
 import Image from "next/image";
+import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const router = useRouter();
 
   const [showPassword, setShowPassword] = useState(false);
-
   const [formData, setFormData] = useState({
     username: "",
     password: "",
   });
-
   const [remember, setRemember] = useState(false);
-
-  const [error, setError] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
-
-    setError("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    setError("");
+    const toastId = toast.loading("Signing in...");
 
     try {
-      // LOGIN
       const res = await loginUser({
         username: formData.username,
         password: formData.password,
@@ -49,21 +42,20 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || "Login failed");
+        toast.error(data.message || "Login failed", { id: toastId });
         return;
       }
 
-      // PRELOAD USER
       const user = await getAuthUser();
 
-      // CACHE USER
       sessionStorage.setItem("auth_user", JSON.stringify(user));
 
-      // REDIRECT
+      toast.success(data.message || "Welcome back!", { id: toastId });
+
       router.replace("/dashboard");
     } catch (error) {
       console.error(error);
-      setError("Cannot connect to server");
+      toast.error("Cannot connect to server", { id: toastId });
     }
   };
 
@@ -94,10 +86,7 @@ export default function LoginPage() {
                 onChange={handleChange}
                 className="w-full h-12 sm:h-14 px-4 pr-10 rounded-xl bg-gray-100 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
               />
-              <User
-                size={18}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
+              <User size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
             </div>
           </div>
 
@@ -145,12 +134,7 @@ export default function LoginPage() {
             </label>
           </div>
 
-          {/* ERROR */}
-          {error && (
-            <div className="bg-red-50 border border-red-300 text-red-600 text-sm px-4 py-3 rounded-xl">
-              {error}
-            </div>
-          )}
+          {/* ERROR BLOCK DIHAPUS - Digantikan oleh Toast */}
 
           {/* LOGIN BUTTON */}
           <button
@@ -189,10 +173,7 @@ export default function LoginPage() {
 
         <p className="text-center mt-8 text-sm text-gray-500">
           Don&apos;t have an account?{" "}
-          <Link
-            href="/register"
-            className="text-blue-600 font-semibold hover:underline"
-          >
+          <Link href="/register" className="text-blue-600 font-semibold hover:underline">
             Sign Up
           </Link>
         </p>
