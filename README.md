@@ -1,25 +1,35 @@
 KODE PBL: IF-4PC-13
-
 Judul: Smart Energy Management System Berbasis IoT untuk Monitoring Listrik Rumah Tangga
 
 ---
 
 Deskripsi
-Proyek ini merupakan sistem berbasis Internet of Things (IoT) yang digunakan untuk memonitor penggunaan listrik rumah tangga secara real-time.
-Sistem ini mampu menampilkan parameter listrik seperti tegangan, arus, daya, energi (kWh), serta estimasi biaya listrik.
+
+Proyek ini mengembangkan sistem monitoring dan analisis konsumsi energi listrik rumah tangga berbasis Internet of Things (IoT) yang mengintegrasikan hardware berupa sensor arus dan tegangan dengan mikrokontroler ESP32, serta software berupa web dashboard interaktif. Data konsumsi listrik dikumpulkan secara real-time, dikirim melalui jaringan internet, kemudian diolah dan disimpan pada basis data terpusat untuk divisualisasikan melalui antarmuka web. Sistem menyediakan fitur pemantauan konsumsi harian dan bulanan, analisis perangkat dengan konsumsi tertinggi, estimasi biaya listrik berdasarkan tarif per kWh, serta notifikasi lonjakan penggunaan. Pengembangan difokuskan pada akurasi pengukuran, keandalan transmisi data, dan penyajian informasi yang intuitif sehingga membantu pengguna memantau, menganalisis, dan mengoptimalkan penggunaan energi secara efisien.
+
+---
+
+Pengembang Proyek
+
+- Fahmi Ahmad Fardani - 3312401017
+- Aisyah Nurwa Hida - 3312401004
 
 ---
 
 Fitur Utama
+
 - Monitoring tegangan, arus, daya, dan kWh secara real-time
 - Perhitungan estimasi biaya listrik
-- Notifikasi jika daya atau biaya melebihi batas
+- Notifikasi pada dashboard ketika daya melebihi batas
+- Notifikasi whatsapp ketika biaya melebihi batas
 - Penyimpanan riwayat penggunaan listrik harian, mingguan, dan bulanan
+- Export excel pada riwayat penggunaan listrik
 - Kontrol listrik (ON/OFF) melalui website
 
 ---
 
 Tools yang digunakan
+
 - Backend: Laravel
 - Frontend: Next.js
 - Database: MySQL (Laragon)
@@ -27,10 +37,14 @@ Tools yang digunakan
 
 ---
 
-File ATS
-Link Draft Laporan  : https://drive.google.com/file/d/15HiV5Xz52EpGh7V4o4UEhoyqOkfb3Kay/view?usp=drive_link 
-Link Video          : https://youtu.be/SgRy4yOeZEY?si=MnpQWsCtcud8josn 
+Berkas PBL
 
+Link Video ATS : https://youtu.be/SgRy4yOeZEY?si=MnpQWsCtcud8josn
+Link Laporan : https://drive.google.com/file/d/1Xi1e9VYg6y_yVQ6eSyEjpZql_yZ0U_Xl/view?usp=drive_link
+Link Video AAS : https://youtu.be/V1CKMo2JZlI?si=eze5sgC8R0Ox4jS7
+Link Demonstrasi : https://youtu.be/XCu4rKjglX8?si=DvvD8At3dWtGeJTi
+
+---
 
 # Installation & Setup
 
@@ -189,15 +203,15 @@ Upload program ke ESP32.
 
 ## Hardware Wiring
 
-| Komponen | ESP32 |
-|----------|-------|
-| PZEM TX | GPIO16 |
-| PZEM RX | GPIO17 |
+| Komponen | ESP32  |
+| -------- | ------ |
+| PZEM TX  | GPIO16 |
+| PZEM RX  | GPIO17 |
 | Relay IN | GPIO27 |
-| LCD SDA | GPIO21 |
-| LCD SCL | GPIO22 |
-| LCD VCC | 5V |
-| LCD GND | GND |
+| LCD SDA  | GPIO21 |
+| LCD SCL  | GPIO22 |
+| LCD VCC  | 5V     |
+| LCD GND  | GND    |
 
 ---
 
@@ -213,3 +227,4 @@ Pastikan seluruh layanan telah berjalan:
 - ESP32 terhubung ke broker MQTT.
 
 Jika seluruh langkah telah dilakukan dengan benar, data sensor akan dikirim dari ESP32 melalui MQTT, disimpan ke database MySQL oleh backend Laravel, dan ditampilkan secara real-time pada dashboard web.
+Berkas PBL
