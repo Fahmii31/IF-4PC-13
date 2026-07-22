@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\DB;
 
 class HistoryController extends Controller
 {
-    // 1. Ambil data Harian (Untuk halaman Consumption)
     public function getDailyHistory(Request $request)
     {
         $user = $request->user();
@@ -27,8 +26,6 @@ class HistoryController extends Controller
         return response()->json($histories);
     }
 
-    // 2. Ambil data Bulanan (Untuk halaman Analytics - Tab Monthly)
-    // 2. Ambil data Bulanan (Untuk halaman Analytics - Tab Monthly)
     public function getAnalyticsHistory(Request $request)
     {
         $year = $request->query('year', date('Y'));
@@ -51,7 +48,6 @@ class HistoryController extends Controller
             ->whereYear('tanggal', $year);
 
         if ($month !== 'ALL') {
-            // JIKA FILTER BULAN DIPILIH -> Tampilkan harian (1 s/d akhir bulan)
             $query->whereMonth('tanggal', $month);
             $dataFromDb = $query->select(
                 DB::raw('DAY(tanggal) as label_num'),
@@ -75,7 +71,7 @@ class HistoryController extends Controller
                 $chartData[] = [
                     'label' => (string)$i,
                     'total_kwh' => $hasData ? round($data->total_kwh, 2) : 0,
-                    'avg_power' => $hasData ? round($data->avg_power, 1) : 0,
+                    'avg_power' => $hasData ? round($data->avg_power, 2) : 0,
                 ];
 
                 if ($hasData) {
@@ -88,14 +84,13 @@ class HistoryController extends Controller
                         'label' => "$i " . Carbon::createFromDate($year, $month, 1)->format('M') . " $year",
                         'total_kwh' => round($data->total_kwh, 2),
                         'avg_current' => round($data->avg_current, 2),
-                        'avg_voltage' => round($data->avg_voltage, 1),
-                        'avg_power' => round($data->avg_power, 1),
-                        'total_cost' => $data->total_cost
+                        'avg_voltage' => round($data->avg_voltage, 2),
+                        'avg_power' => round($data->avg_power, 2),
+                        'total_cost' => round($data->total_cost, 2),
                     ];
                 }
             }
         } else {
-            // JIKA TAHUNAN ('ALL') -> Tampilkan bulanan (Jan - Des)
             $dataFromDb = $query->select(
                 DB::raw('MONTH(tanggal) as label_num'),
                 DB::raw('SUM(total_kwh) as total_kwh'),
@@ -121,7 +116,7 @@ class HistoryController extends Controller
                 $chartData[] = [
                     'label' => $name,
                     'total_kwh' => $hasData ? round($data->total_kwh, 2) : 0,
-                    'avg_power' => $hasData ? round($data->avg_power, 1) : 0,
+                    'avg_power' => $hasData ? round($data->avg_power, 2) : 0,
                 ];
 
                 if ($hasData) {
@@ -134,15 +129,15 @@ class HistoryController extends Controller
                         'label' => "$name $year",
                         'total_kwh' => round($data->total_kwh, 2),
                         'avg_current' => round($data->avg_current, 2),
-                        'avg_voltage' => round($data->avg_voltage, 1),
-                        'avg_power' => round($data->avg_power, 1),
-                        'total_cost' => $data->total_cost
+                        'avg_voltage' => round($data->avg_voltage, 2),
+                        'avg_power' => round($data->avg_power, 2),
+                        'total_cost' => round($data->total_cost, 2)
                     ];
                 }
             }
         }
 
-        $avgBaseLoad = $activeMonthsCount > 0 ? round($totalPowerForAvg / $activeMonthsCount, 1) : 0;
+        $avgBaseLoad = $activeMonthsCount > 0 ? round($totalPowerForAvg / $activeMonthsCount, 2) : 0;
 
         return response()->json([
             'status' => 'success',

@@ -42,7 +42,7 @@ export default function ExportExcel({
 
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
 
@@ -52,29 +52,37 @@ export default function ExportExcel({
     });
 
     if (filteredData.length === 0) {
-      const options: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
+      const options: Intl.DateTimeFormatOptions = {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      };
       const formattedStart = start.toLocaleDateString("en-US", options);
       const formattedEnd = end.toLocaleDateString("en-US", options);
-      
+
       setDateAlertMessage(`Data from ${formattedStart} to ${formattedEnd} is not available.`);
       return;
     }
 
     setDateAlertMessage(null);
 
-    const dateOptions: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
+    const dateOptions: Intl.DateTimeFormatOptions = {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    };
     const headerStart = start.toLocaleDateString("en-US", dateOptions);
     const headerEnd = end.toLocaleDateString("en-US", dateOptions);
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("VoltCore Report", {
-      views: [{ showGridLines: true }]
+      views: [{ showGridLines: true }],
     });
 
     worksheet.addRow(["VOLTCORE - POWER INTELLIGENCE REPORT"]);
     worksheet.addRow([`PERIOD: ${headerStart.toUpperCase()} TO ${headerEnd.toUpperCase()}`]);
     worksheet.addRow([`EXPORTED AT: ${new Date().toLocaleString("en-US")}`]);
-    worksheet.addRow([]); 
+    worksheet.addRow([]);
 
     ["A1:G1", "A2:G2", "A3:G3"].forEach((cellRange, idx) => {
       worksheet.mergeCells(cellRange);
@@ -89,13 +97,13 @@ export default function ExportExcel({
     worksheet.getRow(1).height = 28;
 
     const headers = [
-      "NO", 
-      "RECORD DATE", 
-      "ENERGY CONSUMPTION (kWh)", 
-      "CURRENT (A)", 
-      "VOLTAGE (V)", 
-      "POWER LOAD (W)", 
-      "TOTAL COST (Rp)"
+      "NO",
+      "RECORD DATE",
+      "ENERGY (kWh)",
+      "CURRENT (A)",
+      "VOLTAGE (V)",
+      "POWER LOAD (W)",
+      "TOTAL COST (Rp)",
     ];
     const headerRow = worksheet.addRow(headers);
     headerRow.height = 26;
@@ -104,7 +112,7 @@ export default function ExportExcel({
       cell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "2B65A1" }
+        fgColor: { argb: "2B65A1" },
       };
       cell.font = { name: "Segoe UI", size: 10, bold: true, color: { argb: "FFFFFF" } };
       cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
@@ -112,41 +120,41 @@ export default function ExportExcel({
         top: { style: "thin", color: { argb: "CBD5E1" } },
         bottom: { style: "thin", color: { argb: "CBD5E1" } },
         left: { style: "thin", color: { argb: "CBD5E1" } },
-        right: { style: "thin", color: { argb: "CBD5E1" } }
+        right: { style: "thin", color: { argb: "CBD5E1" } },
       };
     });
 
     filteredData.forEach((record, index) => {
-      const rawCost = record.cost.replace(/\./g, "").replace(/[^0-9]/g, "");
+      const rawCost = Number(record.cost.replace(/\./g, "").replace(",", "."));
 
       const dataRow = worksheet.addRow([
         index + 1,
         record.date,
-        parseFloat(record.energy),
-        parseFloat(record.current),
-        parseFloat(record.voltage),
-        parseInt(record.power),
-        parseInt(rawCost || "0")
+        Number(record.energy),
+        Number(record.current),
+        Number(record.voltage),
+        Number(record.power),
+        rawCost,
       ]);
-      
+
       dataRow.height = 22;
-      const isEven = (index % 2 === 0);
+      const isEven = index % 2 === 0;
 
       dataRow.eachCell((cell, colNumber) => {
         cell.font = { name: "Segoe UI", size: 10, color: { argb: "333333" } };
-        
+
         cell.border = {
           top: { style: "thin", color: { argb: "E2E8F0" } },
           bottom: { style: "thin", color: { argb: "E2E8F0" } },
           left: { style: "thin", color: { argb: "E2E8F0" } },
-          right: { style: "thin", color: { argb: "E2E8F0" } }
+          right: { style: "thin", color: { argb: "E2E8F0" } },
         };
 
         if (isEven) {
           cell.fill = {
             type: "pattern",
             pattern: "solid",
-            fgColor: { argb: "F8FAFC" }
+            fgColor: { argb: "F8FAFC" },
           };
         }
 
@@ -156,13 +164,36 @@ export default function ExportExcel({
           cell.alignment = { horizontal: "right", vertical: "middle" };
         }
 
-        if (colNumber === 3 || colNumber === 4 || colNumber === 5) {
-          cell.numFmt = "#,##0.0"; 
-        } else if (colNumber === 6) {
-          cell.numFmt = "#,##0"; 
-        } else if (colNumber === 7) {
-          cell.font = { name: "Segoe UI", size: 10, bold: true, color: { argb: "1B365D" } };
-          cell.numFmt = "#,##0"; 
+        // ENERGY
+        if (colNumber === 3) {
+          cell.numFmt = "0.00";
+        }
+
+        // CURRENT
+        else if (colNumber === 4) {
+          cell.numFmt = "0.00";
+        }
+
+        // VOLTAGE
+        else if (colNumber === 5) {
+          cell.numFmt = "0.00";
+        }
+
+        // POWER
+        else if (colNumber === 6) {
+          cell.numFmt = "0.00";
+        }
+
+        // COST
+        else if (colNumber === 7) {
+          cell.font = {
+            name: "Segoe UI",
+            size: 10,
+            bold: true,
+            color: { argb: "1B365D" },
+          };
+
+          cell.numFmt = '"Rp " #,##0.00';
         }
       });
     });
@@ -171,7 +202,7 @@ export default function ExportExcel({
       let maxLength = 0;
       if (column.eachCell) {
         column.eachCell((cell, rowIdx) => {
-          if (rowIdx < 5) return; 
+          if (rowIdx < 5) return;
           const valueLength = cell.value ? cell.value.toString().length : 0;
           if (valueLength > maxLength) maxLength = valueLength;
         });
@@ -180,9 +211,11 @@ export default function ExportExcel({
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
-    const fileBlob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const fileBlob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     saveAs(fileBlob, `VoltCore_Report_${startDate}_to_${endDate}.xlsx`);
-    
+
     handleClose();
   };
 
@@ -241,7 +274,7 @@ export default function ExportExcel({
                 End date must be later than start date
               </p>
             )}
-            
+
             {dateAlertMessage && (
               <p className="text-[11px] text-amber-600 font-bold mt-2 bg-amber-50 p-2.5 border border-amber-200 rounded-lg">
                 {dateAlertMessage}
@@ -251,7 +284,10 @@ export default function ExportExcel({
         </div>
 
         <div className="flex gap-3 mt-8">
-          <button onClick={handleClose} className="flex-1 py-3 text-sm font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200">
+          <button
+            onClick={handleClose}
+            className="flex-1 py-3 text-sm font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200"
+          >
             Cancel
           </button>
 

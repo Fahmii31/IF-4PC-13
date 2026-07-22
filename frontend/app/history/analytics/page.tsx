@@ -11,16 +11,10 @@ import {
   Loader2,
   ChevronDown,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-
-// Komponen
 import MainLayout from "@/components/layout/MainLayout";
 import Notifications from "@/components/Notifications";
-
 import { useAuth } from "@/hooks/useAuth";
-import { logoutUser } from "@/lib/logout";
 
-// Tipe Data
 type KPIData = {
   accumulated_energy: number;
   total_cost: number;
@@ -43,17 +37,12 @@ type TableItem = {
 };
 
 export default function HistoryAnalyticsPage() {
-  const router = useRouter();
-
-  // AUTH
   const { user } = useAuth();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
-  // State Filter Utama
   const [selectedYear, setSelectedYear] = useState<string>("2026");
   const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
 
-  // State Manajemen Data & UI
   const [kpis, setKpis] = useState<KPIData | null>(null);
   const [chartData, setChartData] = useState<ChartItem[]>([]);
   const [tableData, setTableData] = useState<TableItem[]>([]);
@@ -77,11 +66,6 @@ export default function HistoryAnalyticsPage() {
     { value: "11", label: "November" },
     { value: "12", label: "December" },
   ];
-
-  const handleLogout = async () => {
-    await logoutUser();
-    router.replace("/login");
-  };
 
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -126,13 +110,13 @@ export default function HistoryAnalyticsPage() {
 
   const maxKwhInChart = Math.max(...chartData.map((d) => d.total_kwh), 1);
   const maxWattInChart = Math.max(...chartData.map((d) => d.avg_power), 1);
+  const currentMonthLabel = availableMonths.find((m) => m.value === selectedMonth)?.label || "ALL";
 
   return (
     <>
       <MainLayout
         title="History & Analysis"
         user={user}
-        onLogout={handleLogout}
         onNotificationClick={() => setIsNotificationOpen(true)}
       >
         <div className="p-4 md:p-8 flex-1 space-y-8">
@@ -148,14 +132,18 @@ export default function HistoryAnalyticsPage() {
               {/* Filter Tahun */}
               <div className="relative inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:border-gray-300 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 rounded-xl pl-3 pr-8 py-2 transition-all shadow-sm">
                 <Calendar size={14} className="text-gray-400 flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-gray-500 whitespace-nowrap">
+                  Year:
+                </span>
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(e.target.value)}
-                  className="appearance-none bg-transparent text-xs sm:text-sm font-semibold text-gray-700 outline-none cursor-pointer w-full"
+                  className="appearance-none bg-transparent text-xs sm:text-sm font-bold text-gray-800 outline-none cursor-pointer"
+                  style={{ width: `${selectedYear.length + 1}ch` }}
                 >
                   {availableYears.map((yr) => (
-                    <option key={yr} value={yr}>
-                      Year: {yr}
+                    <option key={yr} value={yr} className="text-gray-700">
+                      {yr}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                     </option>
                   ))}
                 </select>
@@ -168,14 +156,18 @@ export default function HistoryAnalyticsPage() {
               {/* Filter Bulan */}
               <div className="relative inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:border-gray-300 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 rounded-xl pl-3 pr-8 py-2 transition-all shadow-sm">
                 <Filter size={14} className="text-gray-400 flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-gray-500 whitespace-nowrap">
+                  Month:
+                </span>
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="appearance-none bg-transparent text-xs sm:text-sm font-semibold text-gray-700 outline-none cursor-pointer w-full"
+                  className="appearance-none bg-transparent text-xs sm:text-sm font-bold text-gray-800 outline-none cursor-pointer"
+                  style={{ width: `${currentMonthLabel.length + 1}ch` }}
                 >
                   {availableMonths.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      Month: {m.label}
+                    <option key={m.value} value={m.value} className="text-gray-700">
+                      {m.label}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                     </option>
                   ))}
                 </select>
@@ -228,7 +220,11 @@ export default function HistoryAnalyticsPage() {
                       Total Cost Projection
                     </p>
                     <p className="text-2xl font-black text-gray-900 mt-1">
-                      Rp {kpis?.total_cost?.toLocaleString("id-ID") || "0"}
+                      Rp{" "}
+                      {kpis?.total_cost?.toLocaleString("id-ID", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }) || "0,00"}
                     </p>
                   </div>
                 </div>
@@ -242,7 +238,7 @@ export default function HistoryAnalyticsPage() {
                       Average Base Load
                     </p>
                     <p className="text-2xl font-black text-gray-900 mt-1">
-                      {kpis?.avg_base_load?.toFixed(1) || "0.0"}{" "}
+                      {kpis?.avg_base_load?.toFixed(2)}
                       <span className="text-sm font-bold text-gray-500">Watt</span>
                     </p>
                   </div>
@@ -255,7 +251,7 @@ export default function HistoryAnalyticsPage() {
                     <Activity size={16} className="text-blue-500" /> ELECTRICITY USAGE TREND (
                     {selectedMonth === "ALL"
                       ? selectedYear
-                      : `${availableMonths.find((m) => m.value === selectedMonth)?.label} ${selectedYear}`}
+                      : `${currentMonthLabel} ${selectedYear}`}
                     )
                   </h2>
                 </div>
@@ -277,7 +273,9 @@ export default function HistoryAnalyticsPage() {
                           className="flex-shrink-0 flex flex-col items-center justify-end group relative h-full"
                           style={{
                             width:
-                              chartData.length <= 10 ? `calc(100% / ${chartData.length})` : "32px",
+                              selectedMonth === "ALL" || chartData.length <= 12
+                                ? `calc(100% / ${chartData.length})`
+                                : "32px",
                           }}
                         >
                           {/* Tooltip */}
@@ -287,7 +285,7 @@ export default function HistoryAnalyticsPage() {
                             <div className="text-blue-300">kWh : {item.total_kwh.toFixed(2)}</div>
 
                             <div className="text-violet-300">
-                              Watt : {item.avg_power.toFixed(1)}
+                              Watt : {item.avg_power.toFixed(2)}
                             </div>
                           </div>
 
@@ -391,14 +389,18 @@ export default function HistoryAnalyticsPage() {
                               <span
                                 className={`px-2 py-0.5 rounded-md font-bold text-xs ${row.avg_voltage < 220 ? "bg-amber-50 text-amber-600 border border-amber-200" : "text-gray-600"}`}
                               >
-                                {row.avg_voltage.toFixed(1)} V
+                                {row.avg_voltage.toFixed(2)} V
                               </span>
                             </td>
                             <td className="py-4 px-6 text-center text-gray-600">
-                              {row.avg_power.toFixed(1)} W
+                              {row.avg_power.toFixed(2)} W
                             </td>
                             <td className="py-4 px-6 text-right font-bold text-gray-900 whitespace-nowrap">
-                              Rp {row.total_cost.toLocaleString("id-ID")}
+                              Rp{" "}
+                              {Number(row.total_cost).toLocaleString("id-ID", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
                             </td>
                           </tr>
                         ))

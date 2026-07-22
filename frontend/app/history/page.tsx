@@ -1,17 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-
 import { Calendar, FileSpreadsheet, ChevronDown } from "lucide-react";
-
-import { useRouter } from "next/navigation";
-
 import MainLayout from "@/components/layout/MainLayout";
 import Notifications from "@/components/Notifications";
 import ExportExcel from "@/components/ExportExcel";
-
 import { useAuth } from "@/hooks/useAuth";
-import { logoutUser } from "@/lib/logout";
 
 interface UsageRecord {
   date: string;
@@ -32,35 +26,19 @@ interface BackendHistoryItem {
 }
 
 export default function HistoryPage() {
-  const router = useRouter();
-
-  // AUTH
   const { user } = useAuth();
-
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-
   const [showExportModal, setShowExportModal] = useState(false);
-
   const [visibleRecords, setVisibleRecords] = useState(8);
 
-  // STATE DATA & ERROR
   const [consumptionData, setConsumptionData] = useState<UsageRecord[]>([]);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  // LOGOUT
-  const handleLogout = async () => {
-    await logoutUser();
-
-    router.replace("/login");
-  };
-
-  // AMBIL DATA BERDASARKAN MEKANISME COOKIE SANCTUM
   useEffect(() => {
     const fetchHistoryData = async () => {
       try {
         setApiError(null);
 
-        // DISESUAIKAN: Menggunakan credentials include & Accept json seperti lib/auth.ts
         const res = await fetch("http://localhost:8000/api/history/daily", {
           method: "GET",
           credentials: "include",
@@ -89,17 +67,20 @@ export default function HistoryPage() {
 
           return {
             date: formattedDate,
-            energy: String(item.total_kwh ?? "0"),
-            current: String(item.arus_ampere ?? "0"),
-            voltage: String(item.tegangan_volt ?? "0"),
-            power: String(item.daya_watt ?? "0"),
-            cost: item.total_biaya ? Number(item.total_biaya).toLocaleString("id-ID") : "0",
+            energy: Number(item.total_kwh ?? 0).toFixed(2),
+            current: Number(item.arus_ampere ?? 0).toFixed(2),
+            voltage: Number(item.tegangan_volt ?? 0).toFixed(2),
+            power: Number(item.daya_watt ?? 0).toFixed(2),
+            cost: Number(item.total_biaya ?? 0).toLocaleString("id-ID", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }),
           };
         });
 
         setConsumptionData(mappedData);
-      } catch (error) {
-        setApiError("Gagal terhubung ke server backend (Pastikan server Laravel berjalan).");
+      } catch {
+        setApiError("Failed to fetch history data");
       }
     };
 
@@ -115,7 +96,6 @@ export default function HistoryPage() {
       <MainLayout
         title="History & Analysis"
         user={user}
-        onLogout={handleLogout}
         onNotificationClick={() => setIsNotificationOpen(true)}
       >
         <div className="p-4 md:p-8 flex-1 space-y-8">
